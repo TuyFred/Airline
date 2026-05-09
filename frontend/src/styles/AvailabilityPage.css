@@ -1,0 +1,90 @@
+.availability-main {
+  min-height: 100vh;
+  padding: 100px 20px 40px;
+  background: linear-gradient(180deg, #f4f9ff 0%, #ffffff 100%);
+}
+
+.availability-hero {
+  max-width: 1200px;
+  margin: 0 auto 1.4rem;
+}
+
+.availability-hero h1 {
+  font-size: 2.3rem;
+  color: #081a3f;
+}
+
+.availability-hero p {
+  margin-top: 0.5rem;
+  color: #4c637f;
+}
+
+.availability-filter-card {
+  max-width: 1200px;
+  margin: 0 auto 1rem;
+  padding: 1rem;
+  border-radius: 18px;
+  background: #fff;
+  border: 1px solid rgba(0, 82, 204, 0.1);
+  box-shadow: 0 14px 36px rgba(11, 36, 96, 0.07);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+.availability-filter-card label {
+  display: grid;
+  gap: 0.35rem;
+  color: #081a3f;
+  font-weight: 700;
+}
+
+.availability-filter-card input,
+.availability-filter-card select {
+  border: 1px solid rgba(0, 82, 204, 0.16);
+  border-radius: 12px;
+  padding: 0.75rem 0.8rem;
+}
+
+.availability-table-card {
+  max-width: 1200px;
+  margin: 0 auto;
+  border-radius: 18px;
+  overflow: auto;
+  background: #fff;
+  border: 1px solid rgba(0, 82, 204, 0.1);
+  box-shadow: 0 14px 36px rgba(11, 36, 96, 0.07);
+}
+
+.availability-table-card table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.availability-table-card th,
+.availability-table-card td {
+  padding: 0.9rem;
+  border-bottom: 1px solid rgba(0, 82, 204, 0.08);
+  text-align: left;
+}
+
+.claim-space-btn {
+  display: inline-flex;
+  padding: 0.45rem 0.8rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #0052cc, #00c853);
+  color: #fff;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.claim-login-hint {
+  color: #6b7280;
+  font-weight: 700;
+}
+
+@media (max-width: 900px) {
+  .availability-filter-card {
+    grid-template-columns: 1fr;
+  }
+}

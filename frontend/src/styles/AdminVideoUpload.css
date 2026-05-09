@@ -1,0 +1,279 @@
+/* Admin Video Upload Section */
+.video-section {
+  padding: 80px 20px;
+  background: linear-gradient(180deg, #f5f7fa 0%, #ffffff 100%);
+}
+
+.video-header {
+  text-align: center;
+  max-width: 900px;
+  margin: 0 auto 2.5rem;
+}
+
+.video-panel {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 1.5rem;
+  align-items: stretch;
+}
+
+.video-player-shell,
+.video-upload-card {
+  background: #fff;
+  border-radius: 24px;
+  box-shadow: 0 18px 44px rgba(11, 36, 96, 0.1);
+  border: 1px solid rgba(0, 82, 204, 0.12);
+  overflow: hidden;
+}
+
+.video-player-shell {
+  position: relative;
+  min-height: 360px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #d6ecff 0%, #f8fbff 100%);
+}
+
+.hero-video {
+  width: 100%;
+  height: 100%;
+  min-height: 360px;
+  object-fit: cover;
+  display: block;
+  background: #0b63ce;
+}
+
+.video-empty-state {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 0.65rem;
+  text-align: center;
+  color: #0f172a;
+  padding: 2rem;
+  pointer-events: none;
+  background: radial-gradient(circle at top, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.1));
+}
+
+.video-empty-icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #0052cc;
+  color: #fff;
+  font-size: 1.8rem;
+  box-shadow: 0 10px 24px rgba(0, 82, 204, 0.28);
+}
+
+.video-empty-state p {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.video-empty-state span {
+  max-width: 430px;
+  color: #475569;
+}
+
+.video-upload-card {
+  padding: 1.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.video-upload-card h3 {
+  font-size: 1.25rem;
+  color: #0f172a;
+}
+
+.video-upload-card p {
+  color: #475569;
+  line-height: 1.65;
+}
+
+.token-field {
+  display: grid;
+  gap: 0.45rem;
+  color: #0f172a;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.token-field input {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 82, 204, 0.16);
+  background: #f8fbff;
+  padding: 0.85rem 0.95rem;
+  font-size: 0.95rem;
+}
+
+.token-field input:focus {
+  outline: none;
+  border-color: #0052cc;
+  box-shadow: 0 0 0 3px rgba(0, 82, 204, 0.12);
+}
+
+.upload-button {
+  width: 100%;
+  border: 0;
+  border-radius: 14px;
+  padding: 0.95rem 1.2rem;
+  background: linear-gradient(135deg, #0052cc, #00c853);
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.98rem;
+  box-shadow: 0 12px 28px rgba(0, 82, 204, 0.18);
+}
+
+.upload-button:hover {
+  transform: translateY(-2px);
+}
+
+.upload-status {
+  margin: 0;
+  color: #0b63ce;
+  font-weight: 700;
+}
+
+.hidden-input {
+  display: none;
+}
+
+.video-meta {
+  display: grid;
+  gap: 1rem;
+  margin-top: auto;
+}
+
+.video-meta div {
+  border-radius: 16px;
+  padding: 1rem;
+  background: linear-gradient(135deg, rgba(0, 82, 204, 0.06), rgba(0, 255, 136, 0.08));
+}
+
+.video-meta strong {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: #0f172a;
+}
+
+.video-meta p {
+  font-size: 0.92rem;
+  color: #334155;
+}
+
+@media (max-width: 900px) {
+  .video-panel {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .video-section {
+    padding: 60px 15px;
+  }
+
+  .hero-video,
+  .video-player-shell {
+    min-height: 260px;
+  }
+}
+
+/* ===== Admin: Audio toggle for hero video ===== */
+.audio-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
+  border-radius: 14px;
+  border: 1px solid #dbeafe;
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.08), rgba(59, 130, 246, 0.06));
+  flex-wrap: wrap;
+}
+
+.audio-toggle-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.audio-toggle-text strong {
+  color: #0f172a;
+  font-size: 0.92rem;
+}
+
+.audio-toggle-text span {
+  color: #475569;
+  font-size: 0.78rem;
+}
+
+.audio-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.audio-switch input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  width: 0;
+  height: 0;
+}
+
+.audio-switch-track {
+  position: relative;
+  width: 50px;
+  height: 28px;
+  border-radius: 999px;
+  background: #cbd5f5;
+  transition: background 0.2s ease;
+  flex: 0 0 auto;
+}
+
+.audio-switch-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.25);
+  transition: transform 0.2s ease;
+}
+
+.audio-switch.on .audio-switch-track {
+  background: linear-gradient(135deg, #16a34a, #0ea5e9);
+}
+
+.audio-switch.on .audio-switch-thumb {
+  transform: translateX(22px);
+}
+
+.audio-switch-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #1e3a8a;
+  letter-spacing: 0.02em;
+}
+
+.audio-switch.saving {
+  opacity: 0.7;
+  cursor: progress;
+}

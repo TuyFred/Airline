@@ -1,0 +1,510 @@
+/* ── Admin Modal Overlay ───────────────────────────────────────────────── */
+.admin-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 21, 44, 0.6);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 1000;
+  animation: admin-fade-in 0.2s ease-out;
+}
+
+@keyframes admin-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ── Modal Container ────────────────────────────────────────────────────── */
+.admin-modal {
+  width: min(640px, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  border-radius: 20px;
+  box-shadow: 0 32px 72px rgba(8, 21, 44, 0.4);
+  border: 1px solid rgba(11, 99, 206, 0.15);
+  padding: 2rem 2.2rem;
+  font-family: 'Inter', system-ui, -apple-system, Segoe UI, sans-serif;
+  color: #0a1f3d;
+  animation: admin-slide-up 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes admin-slide-up {
+  from { 
+    transform: translateY(20px) scale(0.96); 
+    opacity: 0; 
+  }
+  to   { 
+    transform: translateY(0) scale(1); 
+    opacity: 1; 
+  }
+}
+
+/* ── Modal Header ───────────────────────────────────────────────────────── */
+.admin-modal-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.2rem;
+  margin-bottom: 1.8rem;
+  padding-bottom: 1.2rem;
+  border-bottom: 2px solid rgba(11, 99, 206, 0.1);
+}
+
+.admin-modal-header h2 {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #0b51aa;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.admin-modal-subtitle {
+  margin: 0.5rem 0 0;
+  font-size: 0.9rem;
+  color: #5b6b80;
+  line-height: 1.5;
+  font-weight: 400;
+}
+
+.admin-modal-close {
+  background: rgba(11, 99, 206, 0.08);
+  border: 1.5px solid rgba(11, 99, 206, 0.2);
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 1.1rem;
+  color: #5b6b80;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.admin-modal-close:hover {
+  background: #f44336;
+  color: #fff;
+  border-color: #f44336;
+  transform: rotate(90deg);
+}
+
+/* ── Form Elements ──────────────────────────────────────────────────────── */
+.admin-modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.4rem;
+}
+
+.admin-modal-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.2rem;
+}
+
+.admin-modal-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.admin-modal-label-text {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #2c3a52;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.required {
+  color: #f44336;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.admin-modal-label input,
+.admin-modal-label select {
+  padding: 0.85rem 1rem;
+  border: 2px solid #d6dee9;
+  border-radius: 12px;
+  font-size: 0.95rem;
+  background: #fff;
+  color: #0a1f3d;
+  transition: all 0.2s ease;
+  font-family: inherit;
+  font-weight: 500;
+}
+
+.admin-modal-label input:focus,
+.admin-modal-label select:focus {
+  outline: none;
+  border-color: #0b51aa;
+  box-shadow: 0 0 0 4px rgba(11, 81, 170, 0.1);
+  background: #fcfdff;
+}
+
+.admin-modal-label input::placeholder {
+  color: #9aa6ba;
+  font-weight: 400;
+}
+
+.admin-modal-label select {
+  cursor: pointer;
+}
+
+/* ── Input Group (for add buttons) ──────────────────────────────────────── */
+.admin-modal-input-group {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.admin-modal-input-group input {
+  flex: 1;
+  padding: 0.85rem 1rem;
+  border: 2px solid #d6dee9;
+  border-radius: 12px;
+  font-size: 0.95rem;
+  background: #fff;
+  color: #0a1f3d;
+  transition: all 0.2s ease;
+  font-family: inherit;
+  font-weight: 500;
+}
+
+.admin-modal-input-group input:focus {
+  outline: none;
+  border-color: #0b51aa;
+  box-shadow: 0 0 0 4px rgba(11, 81, 170, 0.1);
+}
+
+.admin-modal-add-btn {
+  padding: 0.85rem 1.4rem;
+  border: 2px solid #0b51aa;
+  border-radius: 12px;
+  background: #0b51aa;
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.admin-modal-add-btn:hover {
+  background: #1a73d3;
+  border-color: #1a73d3;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(11, 81, 170, 0.25);
+}
+
+/* ── Section (for grouped fields) ───────────────────────────────────────── */
+.admin-modal-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 1.2rem;
+  background: rgba(11, 99, 206, 0.04);
+  border: 1px solid rgba(11, 99, 206, 0.12);
+  border-radius: 14px;
+}
+
+/* ── Chips (for destinations) ───────────────────────────────────────────── */
+.admin-modal-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+}
+
+.admin-modal-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.9rem;
+  background: #fff;
+  border: 2px solid #0b51aa;
+  border-radius: 999px;
+  font-size: 0.88rem;
+  color: #0b51aa;
+  transition: all 0.2s ease;
+  animation: admin-chip-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes admin-chip-in {
+  from { 
+    transform: scale(0.8); 
+    opacity: 0; 
+  }
+  to   { 
+    transform: scale(1); 
+    opacity: 1; 
+  }
+}
+
+.admin-modal-chip.transit {
+  border-color: #f3a73a;
+  color: #f3a73a;
+  background: rgba(243, 167, 58, 0.08);
+}
+
+.admin-modal-chip-text {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.admin-modal-chip-text strong {
+  font-weight: 700;
+}
+
+.admin-modal-chip-toggle {
+  background: none;
+  border: none;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+  color: inherit;
+  font-family: inherit;
+  transition: all 0.15s;
+  border-radius: 6px;
+}
+
+.admin-modal-chip-toggle:hover {
+  background: rgba(11, 81, 170, 0.1);
+}
+
+.admin-modal-chip.transit .admin-modal-chip-toggle:hover {
+  background: rgba(243, 167, 58, 0.15);
+}
+
+.admin-modal-chip-remove {
+  background: rgba(11, 81, 170, 0.1);
+  border: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: #0b51aa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  font-weight: 700;
+}
+
+.admin-modal-chip-remove:hover {
+  background: #f44336;
+  color: #fff;
+  transform: scale(1.1);
+}
+
+/* ── Hint Text ──────────────────────────────────────────────────────────── */
+.admin-modal-hint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #6b7a90;
+  line-height: 1.5;
+  font-style: italic;
+  padding: 0.7rem 1rem;
+  background: rgba(107, 122, 144, 0.08);
+  border-radius: 10px;
+  border-left: 3px solid #6b7a90;
+}
+
+/* ── Calculations (for PMC) ─────────────────────────────────────────────── */
+.admin-modal-calculations {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.admin-modal-calc-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 1rem 1.2rem;
+  background: linear-gradient(135deg, rgba(11, 99, 206, 0.08), rgba(26, 115, 211, 0.12));
+  border: 2px solid rgba(11, 99, 206, 0.2);
+  border-radius: 14px;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.admin-modal-calc-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(11, 99, 206, 0.15);
+}
+
+.admin-modal-calc-label {
+  font-size: 0.82rem;
+  color: #5b6b80;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.admin-modal-calc-value {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #0b51aa;
+  line-height: 1;
+}
+
+/* ── Info Box ───────────────────────────────────────────────────────────── */
+.admin-modal-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  padding: 0.9rem 1.1rem;
+  background: rgba(26, 115, 211, 0.08);
+  border: 1px solid rgba(26, 115, 211, 0.2);
+  border-radius: 12px;
+  font-size: 0.86rem;
+  color: #2c3a52;
+  line-height: 1.5;
+}
+
+.admin-modal-info-icon {
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+
+.admin-modal-info p {
+  margin: 0;
+}
+
+/* ── Action Buttons ─────────────────────────────────────────────────────── */
+.admin-modal-actions {
+  display: flex;
+  gap: 0.9rem;
+  margin-top: 0.8rem;
+  padding-top: 1.4rem;
+  border-top: 2px solid rgba(11, 99, 206, 0.1);
+}
+
+.admin-modal-btn {
+  flex: 1;
+  padding: 0.95rem 1.4rem;
+  border-radius: 14px;
+  border: none;
+  font-size: 0.98rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.admin-modal-btn-secondary {
+  background: #f4f8fd;
+  color: #5b6b80;
+  border: 2px solid #d6dee9;
+}
+
+.admin-modal-btn-secondary:hover {
+  background: #e8f0f9;
+  color: #2c3a52;
+  border-color: #b8c5d8;
+}
+
+.admin-modal-btn-primary {
+  background: linear-gradient(135deg, #0b51aa 0%, #1a73d3 100%);
+  color: #fff;
+  box-shadow: 0 6px 20px rgba(11, 81, 170, 0.25);
+}
+
+.admin-modal-btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 28px rgba(11, 81, 170, 0.35);
+}
+
+.admin-modal-btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ── Responsive ─────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .admin-modal {
+    padding: 1.5rem 1.3rem;
+    border-radius: 16px;
+  }
+
+  .admin-modal-header {
+    margin-bottom: 1.3rem;
+    padding-bottom: 1rem;
+  }
+
+  .admin-modal-header h2 {
+    font-size: 1.35rem;
+  }
+
+  .admin-modal-subtitle {
+    font-size: 0.85rem;
+  }
+
+  .admin-modal-row {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .admin-modal-calculations {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-modal-actions {
+    flex-direction: column-reverse;
+  }
+
+  .admin-modal-btn {
+    width: 100%;
+  }
+
+  .admin-modal-chips {
+    gap: 0.5rem;
+  }
+
+  .admin-modal-chip {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+@media (max-width: 480px) {
+  .admin-modal {
+    max-height: 95vh;
+    padding: 1.2rem 1rem;
+  }
+
+  .admin-modal-header h2 {
+    font-size: 1.2rem;
+  }
+
+  .admin-modal-close {
+    width: 32px;
+    height: 32px;
+  }
+
+  .admin-modal-form {
+    gap: 1.1rem;
+  }
+
+  .admin-modal-input-group {
+    flex-direction: column;
+  }
+
+  .admin-modal-add-btn {
+    width: 100%;
+  }
+}

@@ -1,0 +1,13 @@
+# React SPA fallback — required so direct URLs (e.g., sbuexport.com/#login)
+# continue to work after a browser refresh.
+# This file should be placed inside public_html/ on cPanel.
+
+Options -MultiViews
+RewriteEngine On
+
+# Let real files (assets, images, etc.) pass through unchanged
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+
+# Everything else → index.html (React router takes over via hash)
+RewriteRule ^ index.html [L]

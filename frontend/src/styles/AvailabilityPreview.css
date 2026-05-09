@@ -1,0 +1,361 @@
+/* Availability Section */
+.availability-section {
+  padding: 80px 20px;
+  background: linear-gradient(180deg, #f5f7fa 0%, #ffffff 100%);
+}
+
+.availability-section .section-title {
+  margin-bottom: 1rem;
+}
+
+.availability-role-banner {
+  max-width: 1200px;
+  margin: 0 auto 2.5rem;
+  padding: 1.5rem;
+  border-radius: 24px;
+  background: linear-gradient(135deg, rgba(0, 82, 204, 0.08), rgba(0, 255, 136, 0.08));
+  border: 1px solid rgba(0, 82, 204, 0.14);
+  box-shadow: 0 16px 36px rgba(11, 36, 96, 0.08);
+}
+
+.availability-role-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.9rem;
+  margin-top: 1.2rem;
+}
+
+.availability-role-chip {
+  padding: 1rem;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(0, 82, 204, 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.availability-role-chip strong {
+  color: #0b63ce;
+  font-size: 0.95rem;
+}
+
+.availability-role-chip span {
+  color: #475569;
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.availability-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.8rem;
+  max-width: 1200px;
+  margin: 0 auto 3rem;
+}
+
+.availability-card {
+  padding: 1.8rem;
+  border-radius: 16px;
+  background: white;
+  border: 1px solid rgba(0, 82, 204, 0.1);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+  transition: all 0.4s ease;
+  animation: fadeInUp 0.8s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.availability-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #0052cc 0%, #00ff88 100%);
+  transform: scaleX(0);
+  transition: transform 0.4s ease;
+}
+
+.availability-card:hover::before {
+  transform: scaleX(1);
+}
+
+.availability-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 12px 30px rgba(0, 82, 204, 0.15);
+}
+
+/* Available - Green */
+.availability-card.available {
+  border-left: 4px solid #00c853;
+}
+
+.availability-card.available .card-header .status-badge {
+  background: rgba(0, 200, 83, 0.15);
+  color: #00c853;
+}
+
+/* Limited - Yellow */
+.availability-card.limited {
+  border-left: 4px solid #ff9800;
+}
+
+.availability-card.limited .card-header .status-badge {
+  background: rgba(255, 152, 0, 0.15);
+  color: #ff9800;
+}
+
+/* Full - Red */
+.availability-card.full {
+  border-left: 4px solid #f44336;
+  opacity: 0.7;
+}
+
+.availability-card.full .card-header .status-badge {
+  background: rgba(244, 67, 54, 0.15);
+  color: #f44336;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.card-header h4 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 0;
+}
+
+.status-badge {
+  padding: 0.5rem 0.8rem;
+  border-radius: 50px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: all 0.3s ease;
+}
+
+.status-badge.green {
+  background: rgba(0, 200, 83, 0.15);
+  color: #00c853;
+  border: 1px solid rgba(0, 200, 83, 0.3);
+}
+
+.status-badge.yellow {
+  background: rgba(255, 152, 0, 0.15);
+  color: #ff9800;
+  border: 1px solid rgba(255, 152, 0, 0.3);
+}
+
+.status-badge.red {
+  background: rgba(244, 67, 54, 0.15);
+  color: #f44336;
+  border: 1px solid rgba(244, 67, 54, 0.3);
+}
+
+/* Card Body */
+.card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 1.2rem;
+}
+
+.card-body p {
+  font-size: 0.9rem;
+  color: #666;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.card-body strong {
+  color: #1a1a1a;
+}
+
+.route {
+  word-break: break-word;
+}
+
+/* Capacity Info */
+.capacity-info {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.capacity-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 1rem;
+  background: rgba(0, 82, 204, 0.08);
+  border-radius: 10px;
+  text-align: center;
+}
+
+.capacity-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.capacity-value {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #0052cc;
+}
+
+.availability-card.limited .capacity-item {
+  background: rgba(255, 152, 0, 0.08);
+}
+
+.availability-card.limited .capacity-value {
+  color: #ff9800;
+}
+
+.availability-card.limited .capacity-label {
+  color: #ff9800;
+}
+
+.availability-card.full .capacity-item {
+  background: rgba(244, 67, 54, 0.08);
+}
+
+.availability-card.full .capacity-value {
+  color: #f44336;
+}
+
+/* Claim Button */
+.claim-btn {
+  width: 100%;
+  padding: 0.9rem 1.2rem;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #00c853 0%, #00ff88 100%);
+  color: #000;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(0, 200, 83, 0.2);
+}
+
+.claim-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 200, 83, 0.3);
+}
+
+.availability-card.full .claim-btn {
+  background: #e0e0e0;
+  color: #999;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.availability-card.full .claim-btn:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+/* Availability Footer */
+.availability-footer {
+  text-align: center;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, rgba(0, 82, 204, 0.08) 0%, rgba(0, 255, 136, 0.08) 100%);
+  border-radius: 12px;
+  max-width: 900px;
+  margin: 0 auto;
+  border: 1px solid rgba(0, 82, 204, 0.15);
+}
+
+.availability-footer p {
+  font-size: 1.05rem;
+  color: #333;
+  margin: 0 0 1rem;
+}
+
+.link-button {
+  display: inline-block;
+  padding: 0.8rem 1.8rem;
+  background: linear-gradient(135deg, #0052cc 0%, #0099ff 100%);
+  color: white;
+  text-decoration: none;
+  border-radius: 50px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  transition: all 0.3s ease;
+}
+
+.link-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 82, 204, 0.3);
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .availability-role-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .availability-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .availability-section {
+    padding: 60px 15px;
+  }
+
+  .availability-role-banner {
+    padding: 1.2rem;
+  }
+
+  .availability-role-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .availability-grid {
+    grid-template-columns: 1fr;
+    gap: 1.2rem;
+  }
+
+  .availability-card {
+    padding: 1.5rem;
+  }
+
+  .card-header h4 {
+    font-size: 1rem;
+  }
+
+  .card-body p {
+    font-size: 0.85rem;
+  }
+
+  .capacity-value {
+    font-size: 1.2rem;
+  }
+
+  .capacity-label {
+    font-size: 0.7rem;
+  }
+
+  .claim-btn {
+    padding: 0.8rem 1rem;
+    font-size: 0.85rem;
+  }
+}

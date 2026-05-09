@@ -1,0 +1,151 @@
+.support-widget {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  z-index: 2000;
+}
+
+.support-fab {
+  border: 0;
+  border-radius: 999px;
+  padding: 0.68rem 1rem;
+  background: linear-gradient(135deg, #0f4bbd, #1bb66d);
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.86rem;
+  box-shadow: 0 12px 26px rgba(8, 33, 94, 0.24);
+  cursor: pointer;
+}
+
+.support-panel {
+  width: min(350px, calc(100vw - 22px));
+  margin-top: 0.5rem;
+  border-radius: 16px;
+  padding: 0.85rem;
+  background: #fff;
+  border: 1px solid rgba(0, 82, 204, 0.14);
+  box-shadow: 0 16px 34px rgba(11, 36, 96, 0.16);
+  max-height: min(78vh, 620px);
+  overflow: auto;
+}
+
+.support-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.support-header h3 {
+  margin: 0;
+  color: #081a3f;
+  font-size: 1rem;
+}
+
+.support-header p {
+  margin-top: 0.2rem;
+  margin-bottom: 0;
+  font-size: 0.82rem;
+  color: #475569;
+}
+
+.support-close {
+  border: 0;
+  background: rgba(0, 82, 204, 0.08);
+  color: #0b63ce;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.support-form {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 0.65rem;
+}
+
+.support-form label {
+  display: grid;
+  gap: 0.22rem;
+  color: #081a3f;
+  font-weight: 700;
+  font-size: 0.82rem;
+}
+
+.support-form input,
+.support-form textarea {
+  border-radius: 9px;
+  border: 1px solid rgba(0, 82, 204, 0.16);
+  padding: 0.58rem 0.68rem;
+  font-size: 0.86rem;
+}
+
+.support-form textarea {
+  min-height: 70px;
+  resize: vertical;
+}
+
+.support-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.5rem;
+  margin-top: 0.8rem;
+}
+
+.support-btn {
+  border-radius: 10px;
+  border: 0;
+  padding: 0.62rem 0.78rem;
+  text-align: center;
+  text-decoration: none;
+  font-weight: 800;
+  font-size: 0.84rem;
+  cursor: pointer;
+}
+
+.support-btn.whatsapp {
+  background: #25d366;
+  color: #fff;
+}
+
+.support-btn.email {
+  background: #0052cc;
+  color: #fff;
+}
+
+.support-status {
+  margin-top: 0.6rem;
+  font-weight: 700;
+  font-size: 0.82rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 9px;
+}
+
+.support-status.info {
+  color: #0b63ce;
+  background: rgba(11, 99, 206, 0.1);
+}
+
+.support-status.success {
+  color: #167d4a;
+  background: rgba(22, 125, 74, 0.12);
+}
+
+.support-status.error {
+  color: #bd2f45;
+  background: rgba(189, 47, 69, 0.12);
+}
+
+@media (max-width: 480px) {
+  .support-widget {
+    right: 10px;
+    bottom: 10px;
+  }
+
+  .support-panel {
+    width: min(330px, calc(100vw - 16px));
+  }
+}

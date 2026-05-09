@@ -1,0 +1,44 @@
+<svg width="900" height="520" viewBox="0 0 900 520" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#CFE5FF"/>
+      <stop offset="100%" stop-color="#EAF3FF"/>
+    </linearGradient>
+    <linearGradient id="screen" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#2D7FB1"/>
+      <stop offset="100%" stop-color="#0D5E91"/>
+    </linearGradient>
+    <linearGradient id="green" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#14B93E"/>
+      <stop offset="100%" stop-color="#0A9F35"/>
+    </linearGradient>
+    <style>
+      .title { font: 900 66px 'Segoe UI', Arial, sans-serif; fill: #13699B; letter-spacing: 1px; }
+      .subtitle { font: 900 74px 'Segoe UI', Arial, sans-serif; fill: #0FA13A; letter-spacing: 1px; }
+      .line { stroke: #0FA13A; stroke-width: 10; stroke-linecap: round; }
+    </style>
+  </defs>
+
+  <circle cx="450" cy="185" r="170" fill="url(#sky)" stroke="#1D6E9D" stroke-width="5"/>
+
+  <rect x="307" y="118" width="210" height="150" rx="20" fill="url(#screen)"/>
+  <rect x="321" y="132" width="182" height="106" rx="12" fill="#DCEBFA" opacity="0.95"/>
+  <rect x="390" y="270" width="44" height="20" rx="8" fill="#0D5E91"/>
+  <rect x="352" y="288" width="118" height="22" rx="11" fill="#0D5E91"/>
+
+  <polygon points="492,92 600,78 620,103 520,118" fill="url(#green)"/>
+  <polygon points="520,122 625,112 646,136 544,151" fill="url(#green)"/>
+  <polygon points="452,97 512,106 468,190 410,180" fill="url(#green)"/>
+
+  <path d="M498 95L535 119M535 119L548 150M535 119L468 191" stroke="#C8F5D5" stroke-width="8" stroke-linecap="round"/>
+
+  <path d="M463 172L546 186L633 170C640 169 645 175 644 182C643 188 637 193 630 193L552 205L507 253L484 241L515 207L462 196L463 172Z" fill="#FFFFFF"/>
+  <circle cx="577" cy="189" r="6" fill="#9DB3CF"/>
+  <circle cx="603" cy="184" r="6" fill="#9DB3CF"/>
+  <circle cx="625" cy="180" r="6" fill="#9DB3CF"/>
+
+  <text x="450" y="430" text-anchor="middle" class="title">SBU-EXPORT CORDINATION</text>
+  <line x1="86" y1="474" x2="212" y2="474" class="line"/>
+  <text x="450" y="495" text-anchor="middle" class="subtitle">DIGITAL HUB</text>
+  <line x1="686" y1="474" x2="812" y2="474" class="line"/>
+</svg>

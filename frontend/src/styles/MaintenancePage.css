@@ -1,0 +1,92 @@
+.maintenance-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1rem;
+  background: radial-gradient(ellipse 80% 60% at 50% -20%, rgba(11, 99, 206, 0.18), transparent),
+    linear-gradient(180deg, #f4f7fb 0%, #e8eef6 100%);
+}
+
+.maintenance-page__card {
+  max-width: 440px;
+  width: 100%;
+  background: #fff;
+  border-radius: 16px;
+  padding: 2.25rem 2rem;
+  box-shadow: 0 20px 50px rgba(15, 39, 68, 0.12), 0 0 0 1px rgba(15, 39, 68, 0.06);
+  text-align: center;
+}
+
+.maintenance-page__logo {
+  height: 48px;
+  width: auto;
+  margin: 0 auto 1.25rem;
+  display: block;
+  object-fit: contain;
+}
+
+.maintenance-page__badge {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #b45309;
+  background: rgba(245, 158, 11, 0.14);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  margin: 0 0 1rem;
+}
+
+.maintenance-page__title {
+  font-size: 1.45rem;
+  font-weight: 700;
+  color: #0f2744;
+  margin: 0 0 0.75rem;
+  line-height: 1.25;
+}
+
+.maintenance-page__body {
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: #334155;
+  margin: 0 0 1rem;
+}
+
+.maintenance-page__note {
+  font-size: 0.82rem;
+  line-height: 1.45;
+  color: #64748b;
+  margin: 0 0 1.5rem;
+}
+
+.maintenance-page__link {
+  display: block;
+  margin: 0.5rem auto 0;
+  max-width: 280px;
+  padding: 0.65rem 1rem;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
+  background: #0b63ce;
+  color: #fff;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.maintenance-page__link:hover {
+  background: #0954ad;
+  transform: translateY(-1px);
+}
+
+.maintenance-page__link.secondary {
+  background: transparent;
+  color: #0b63ce;
+  border: 1px solid rgba(11, 99, 206, 0.35);
+}
+
+.maintenance-page__link.secondary:hover {
+  background: rgba(11, 99, 206, 0.06);
+}

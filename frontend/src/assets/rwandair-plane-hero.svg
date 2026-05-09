@@ -1,0 +1,51 @@
+<svg width="1200" height="800" viewBox="0 0 1200 800" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="1200" y2="800" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8CCBFF"/>
+      <stop offset="0.48" stop-color="#B9E3FF"/>
+      <stop offset="1" stop-color="#EAF7FF"/>
+    </linearGradient>
+    <linearGradient id="planeBody" x1="260" y1="340" x2="940" y2="470" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F8FBFF"/>
+      <stop offset="0.45" stop-color="#EEF4FA"/>
+      <stop offset="1" stop-color="#DCE6F1"/>
+    </linearGradient>
+    <linearGradient id="planeBlue" x1="280" y1="400" x2="910" y2="500" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#173B9A"/>
+      <stop offset="1" stop-color="#0A1F5B"/>
+    </linearGradient>
+    <radialGradient id="cloudGlow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(655 180) rotate(90) scale(165 250)">
+      <stop stop-color="#FFFFFF" stop-opacity="0.95"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="shadow" x="180" y="260" width="860" height="280" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="18" stdDeviation="16" flood-color="#1D3C6A" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+  <rect width="1200" height="800" rx="28" fill="url(#sky)"/>
+  <circle cx="650" cy="180" r="250" fill="url(#cloudGlow)"/>
+  <circle cx="850" cy="250" r="120" fill="#FFFFFF" fill-opacity="0.9"/>
+  <circle cx="920" cy="220" r="86" fill="#FFFFFF" fill-opacity="0.95"/>
+  <circle cx="790" cy="230" r="96" fill="#FFFFFF" fill-opacity="0.9"/>
+  <circle cx="245" cy="635" r="170" fill="#FFFFFF" fill-opacity="0.32"/>
+  <circle cx="360" cy="685" r="135" fill="#FFFFFF" fill-opacity="0.24"/>
+  <g filter="url(#shadow)">
+    <path d="M154 421C182 391 219 372 260 372H512L712 272C758 249 812 245 861 262L985 305C1009 313 1026 335 1028 360C1031 392 1003 415 971 415H825L807 480C798 509 774 526 744 526C708 526 678 499 676 464V420H470L305 513C287 523 267 527 247 524L173 511C147 506 126 485 122 459C119 444 126 428 138 418L154 421Z" fill="url(#planeBody)"/>
+    <path d="M255 409H720L910 333L823 302C794 292 760 294 733 308L550 402H255Z" fill="url(#planeBlue)"/>
+    <path d="M384 410L518 331C533 322 550 318 566 321L586 325L499 410H384Z" fill="#0B1C4A"/>
+    <path d="M664 355L758 311C779 301 803 299 825 305L847 312L725 370L664 355Z" fill="#173B9A"/>
+    <path d="M782 301L910 255L948 287L847 312L782 301Z" fill="#1F58D6"/>
+    <path d="M278 377C302 367 328 363 354 365L493 373L484 396H301C289 396 279 389 278 377Z" fill="#D8E5F1"/>
+    <path d="M682 425H777V456C777 481 757 501 732 501C708 501 689 481 689 457L682 425Z" fill="#0A1F5B"/>
+    <path d="M748 430H803L842 465H780L748 430Z" fill="#0A1F5B"/>
+    <path d="M458 401L528 361L548 370L478 410L458 401Z" fill="#EEF4FA"/>
+    <path d="M550 350L586 331L607 335L571 355L550 350Z" fill="#EEF4FA"/>
+    <path d="M609 340L654 318L673 323L628 345L609 340Z" fill="#EEF4FA"/>
+    <path d="M670 323L734 292L753 298L689 329L670 323Z" fill="#EEF4FA"/>
+    <circle cx="796" cy="486" r="18" fill="#0A1F5B"/>
+    <circle cx="772" cy="498" r="9" fill="#0A1F5B"/>
+    <circle cx="820" cy="498" r="9" fill="#0A1F5B"/>
+  </g>
+  <path d="M360 116C388 92 425 83 463 90L501 97C529 103 547 128 540 155L527 205C521 228 499 245 475 245H304C260 245 225 212 223 168C221 145 231 122 247 107L360 116Z" fill="#FFFFFF" fill-opacity="0.95"/>
+  <path d="M178 600C210 578 251 570 290 578L330 586C351 590 366 610 362 631C357 659 328 678 300 678H174C138 678 109 651 109 615C109 597 117 580 132 569L178 600Z" fill="#FFFFFF" fill-opacity="0.72"/>
+</svg>
