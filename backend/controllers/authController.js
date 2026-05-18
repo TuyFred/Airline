@@ -32,25 +32,15 @@ async function registerExporter(req, res, next) {
 
     const passwordHash = await bcrypt.hash(password, 10);
     const userResult = await query(
-      `INSERT INTO users (full_name, email, password_hash, role, linked_exporter_id, linked_airline)
-       VALUES (?, ?, ?, 'exporter', ?, NULL)` ,
+      `INSERT INTO users (full_name, email, password_hash, role, linked_exporter_id, linked_airline, is_active)
+       VALUES (?, ?, ?, 'exporter', ?, NULL, 0)` ,
       [full_name, normalizedEmail, passwordHash, exporterResult.insertId]
     );
 
-    const token = jwt.sign({ sub: userResult.insertId, role: 'exporter' }, process.env.JWT_SECRET || "dev-secret", {
-      expiresIn: "12h"
-    });
-
     return res.status(201).json({
-      token,
-      user: {
-        id: userResult.insertId,
-        full_name,
-        email: normalizedEmail,
-        role: 'exporter',
-        linked_exporter_id: exporterResult.insertId,
-        linked_airline: null
-      }
+      pending_approval: true,
+      message:
+        "Registration received. Your exporter account will be inactive until an administrator approves it. You will be able to sign in after approval."
     });
   } catch (error) {
     return next(error);
@@ -77,7 +67,14 @@ async function login(req, res, next) {
     }
 
     const user = users[0];
-    if (!user.is_active) return res.status(403).json({ message: "Account inactive" });
+    if (!user.is_active) {
+      return res.status(403).json({
+        message:
+          user.role === "exporter"
+            ? "Your exporter account is pending administrator approval. You cannot sign in until an admin activates it."
+            : "Account inactive"
+      });
+    }
     if (user.is_locked) return res.status(423).json({ message: "Account locked" });
 
     const valid = await bcrypt.compare(password, user.password_hash);

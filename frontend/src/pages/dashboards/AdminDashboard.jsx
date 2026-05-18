@@ -6,7 +6,7 @@ import PMCSpaceModal from '../../components/PMCSpaceModal';
 import Pagination, { usePagination } from '../../components/Pagination';
 import api from '../../services/api';
 import '../../styles/DashboardPages.css';
-import { PMC_STANDARD_KG, PMC_STANDARD_SKIDS, getDirectionOptions, toPmcTotals } from '../../utils/pmcPlanning';
+import { getDirectionOptions } from '../../utils/pmcPlanning';
 
 const initialUserForm = {
   full_name: '',
@@ -25,6 +25,24 @@ const initialAdminEmailForm = {
 
 function sumCount(rows) {
   return (rows || []).reduce((total, item) => total + Number(item.count || 0), 0);
+}
+
+function csvEscapeCell(v) {
+  const s = String(v ?? '');
+  if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+function downloadCsvFile(filename, headerRow, dataRows) {
+  const lines = [headerRow.map(csvEscapeCell).join(',')];
+  for (const row of dataRows) lines.push(row.map(csvEscapeCell).join(','));
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 export default function AdminDashboard() {
@@ -47,7 +65,17 @@ export default function AdminDashboard() {
   const [userForm, setUserForm] = useState(initialUserForm);
   const [adminEmailForm, setAdminEmailForm] = useState(initialAdminEmailForm);
   const [airlineForm, setAirlineForm] = useState({ id: '', name: '', code: '', from_destination: '' });
-  const [capacityForm, setCapacityForm] = useState({ id: '', airline_id: '', flight_date: '', destination: '', pmc_count: '' });
+  const [capacityForm, setCapacityForm] = useState({
+    id: '',
+    airline_id: '',
+    flight_date: '',
+    destination: '',
+    total_kg: '',
+    total_skids: '',
+    pmc_details: ''
+  });
+  const [showReduceModal, setShowReduceModal] = useState(false);
+  const [reduceForm, setReduceForm] = useState({ capacity_id: '', reduced_skids: '', reduced_kg: '' });
   const [editingUserId, setEditingUserId] = useState(null);
   const [editingAirlineId, setEditingAirlineId] = useState(null);
   const [editingCapacityId, setEditingCapacityId] = useState(null);
@@ -71,24 +99,29 @@ export default function AdminDashboard() {
   const [exporterPerformance, setExporterPerformance] = useState({ summary: [], weekly: [] });
   const [perfFilters, setPerfFilters] = useState({ exporter_id: '', start_date: '', end_date: '' });
   const [exporterPricing, setExporterPricing] = useState([]);
-  const [pricingForm, setPricingForm] = useState({ exporter_id: '', price_per_kg: '', currency: 'USD', notes: '' });
+  const [pricingForm, setPricingForm] = useState({
+    exporter_id: '',
+    price_per_kg: '',
+    pricing_model: 'per_kg',
+    price_per_awb: '',
+    currency: 'USD',
+    notes: ''
+  });
   const [capacityCrunch, setCapacityCrunch] = useState({ daily: [], weekly: [] });
   const [airlineFormDestinations, setAirlineFormDestinations] = useState([]);
   const [destinationDraft, setDestinationDraft] = useState('');
   const [isMainAdmin, setIsMainAdmin] = useState(false);
   const [weeklyReportFilters, setWeeklyReportFilters] = useState({ exporter_id: '', start_date: '', end_date: '' });
-  const [customers, setCustomers] = useState([]);
-  const [customerForm, setCustomerForm] = useState({ id: '', name: '', description: '', website: '', sort_order: '0', is_active: true });
-  const [customerLogoFile, setCustomerLogoFile] = useState(null);
-  const [removeCustomerLogo, setRemoveCustomerLogo] = useState(false);
-  const [editingCustomerId, setEditingCustomerId] = useState(null);
-  const customerFileInputKey = `customer-file-${editingCustomerId || 'new'}`;
   const [resetLogs, setResetLogs] = useState([]);
   const [resetLogsLoading, setResetLogsLoading] = useState(false);
   const [resetLogFilters, setResetLogFilters] = useState({ q: '', action: '' });
   const [showAirlineModal, setShowAirlineModal] = useState(false);
   const [showPMCModal, setShowPMCModal] = useState(false);
   const [modalLoading, setModalLoading] = useState(false);
+  const [reallocExporterPick, setReallocExporterPick] = useState('');
+  const [reallocExporterBookings, setReallocExporterBookings] = useState([]);
+  const [adminEditBookingForm, setAdminEditBookingForm] = useState({ id: '', tonnage_kg: '', skids: '' });
+  const [showAdminEditBooking, setShowAdminEditBooking] = useState(false);
 
   const paidInvoices = invoiceRows.filter((item) => (item.computed_status || item.status) === 'paid').length;
   const overdueInvoices = invoiceRows.filter((item) => (item.computed_status || item.status) === 'overdue').length;
@@ -193,6 +226,25 @@ export default function AdminDashboard() {
     loadAll();
   }, []);
 
+  useEffect(() => {
+    if (activeTab !== 'reallocations' || !reallocExporterPick) {
+      setReallocExporterBookings([]);
+      return undefined;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const rows = await api.apiGet(`/api/bookings/exporter/${reallocExporterPick}`);
+        if (!cancelled) setReallocExporterBookings(rows || []);
+      } catch {
+        if (!cancelled) setReallocExporterBookings([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, reallocExporterPick]);
+
   const loadInvoicesWithFilters = async () => {
     try {
       const params = new URLSearchParams();
@@ -261,21 +313,6 @@ export default function AdminDashboard() {
     loadCapacityCrunch();
   }, [activeTab]);
 
-  const loadCustomers = async () => {
-    try {
-      const rows = await api.apiGet('/api/customers');
-      setCustomers(Array.isArray(rows) ? rows : []);
-    } catch (error) {
-      console.error('Failed to load customers', error);
-      setCustomers([]);
-    }
-  };
-
-  useEffect(() => {
-    if (activeTab !== 'customers') return;
-    loadCustomers();
-  }, [activeTab]);
-
   const loadResetLogs = async () => {
     try {
       setResetLogsLoading(true);
@@ -299,112 +336,144 @@ export default function AdminDashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, resetLogFilters.action]);
 
-  const resetCustomerForm = () => {
-    setCustomerForm({ id: '', name: '', description: '', website: '', sort_order: '0', is_active: true });
-    setCustomerLogoFile(null);
-    setRemoveCustomerLogo(false);
-    setEditingCustomerId(null);
-  };
-
-  const startEditCustomer = (customer) => {
-    setEditingCustomerId(customer.id);
-    setCustomerForm({
-      id: customer.id,
-      name: customer.name || '',
-      description: customer.description || '',
-      website: customer.website || '',
-      sort_order: String(customer.sort_order || 0),
-      is_active: !!customer.is_active
-    });
-    setCustomerLogoFile(null);
-    setRemoveCustomerLogo(false);
-  };
-
-  const submitCustomerForm = async (event) => {
-    event.preventDefault();
-    if (!customerForm.name.trim()) {
-      setMessage('Customer name is required.');
-      return;
-    }
-
-    try {
-      const payload = new FormData();
-      payload.append('name', customerForm.name.trim());
-      payload.append('description', customerForm.description || '');
-      payload.append('website', customerForm.website || '');
-      payload.append('sort_order', String(customerForm.sort_order || 0));
-      payload.append('is_active', customerForm.is_active ? 'true' : 'false');
-      if (customerLogoFile) payload.append('logo', customerLogoFile);
-      if (editingCustomerId && removeCustomerLogo && !customerLogoFile) {
-        payload.append('remove_logo', 'true');
-      }
-
-      if (editingCustomerId) {
-        await api.apiPatch(`/api/customers/${editingCustomerId}`, payload);
-        setMessage(`Customer "${customerForm.name.trim()}" updated.`);
-      } else {
-        await api.apiPost('/api/customers', payload);
-        setMessage(`Customer "${customerForm.name.trim()}" added.`);
-      }
-
-      resetCustomerForm();
-      await loadCustomers();
-      window.dispatchEvent(new Event('customers-updated'));
-    } catch (error) {
-      setMessage(error.message || 'Failed to save customer');
-    }
-  };
-
-  const removeCustomer = async (customer) => {
-    if (!window.confirm(`Remove "${customer.name}" from the homepage?`)) return;
-    try {
-      await api.apiDelete(`/api/customers/${customer.id}`);
-      setMessage(`Customer "${customer.name}" removed.`);
-      if (editingCustomerId === customer.id) {
-        resetCustomerForm();
-      }
-      await loadCustomers();
-      window.dispatchEvent(new Event('customers-updated'));
-    } catch (error) {
-      setMessage(error.message || 'Failed to remove customer');
-    }
-  };
-
-  const toggleCustomerActive = async (customer) => {
-    try {
-      const payload = new FormData();
-      payload.append('name', customer.name);
-      payload.append('description', customer.description || '');
-      payload.append('website', customer.website || '');
-      payload.append('sort_order', String(customer.sort_order || 0));
-      payload.append('is_active', customer.is_active ? 'false' : 'true');
-      await api.apiPatch(`/api/customers/${customer.id}`, payload);
-      await loadCustomers();
-      window.dispatchEvent(new Event('customers-updated'));
-    } catch (error) {
-      setMessage(error.message || 'Failed to update customer visibility');
-    }
-  };
-
   const submitPricingForm = async (event) => {
     event.preventDefault();
-    if (!pricingForm.exporter_id || !pricingForm.price_per_kg) {
-      setMessage('Pick an exporter and enter the agreed price per KG.');
+    if (!pricingForm.exporter_id || pricingForm.price_per_kg === '' || pricingForm.price_per_kg == null) {
+      setMessage('Pick an exporter and enter the price per KG (used as fallback when model is per-kg).');
+      return;
+    }
+    if (pricingForm.pricing_model === 'per_awb' && (pricingForm.price_per_awb === '' || Number(pricingForm.price_per_awb) < 0)) {
+      setMessage('Per-AWB pricing requires a non-negative price per AWB line.');
       return;
     }
     try {
-      await api.apiPost('/api/finance/exporter-pricing', {
+      const payload = {
         exporter_id: Number(pricingForm.exporter_id),
         price_per_kg: Number(pricingForm.price_per_kg),
+        pricing_model: pricingForm.pricing_model || 'per_kg',
         currency: pricingForm.currency || 'USD',
         notes: pricingForm.notes || ''
+      };
+      if (pricingForm.pricing_model === 'per_awb') {
+        payload.price_per_awb = Number(pricingForm.price_per_awb);
+      } else if (pricingForm.price_per_awb !== '' && pricingForm.price_per_awb != null) {
+        payload.price_per_awb = Number(pricingForm.price_per_awb);
+      }
+      await api.apiPost('/api/finance/exporter-pricing', payload);
+      const modelLabel = pricingForm.pricing_model === 'per_awb' ? 'per AWB line' : 'per kg';
+      setMessage(
+        `Price saved. Invoices for this exporter will bill ${modelLabel} (${pricingForm.currency || 'USD'}).`
+      );
+      setPricingForm({
+        exporter_id: '',
+        price_per_kg: '',
+        pricing_model: 'per_kg',
+        price_per_awb: '',
+        currency: 'USD',
+        notes: ''
       });
-      setMessage(`Price saved. New invoices for this exporter will use ${pricingForm.currency || 'USD'} ${Number(pricingForm.price_per_kg).toFixed(2)} / kg.`);
-      setPricingForm({ exporter_id: '', price_per_kg: '', currency: 'USD', notes: '' });
       await loadExporterPricing();
     } catch (error) {
       setMessage(error.message || 'Failed to save exporter price');
     }
+  };
+
+  const downloadAdminAnalyticsOverviewCsv = () => {
+    const header = ['Section', 'Label', 'Value'];
+    const rows = [];
+    (analytics.users || []).forEach((item) => rows.push(['Users by role', item.role, item.count]));
+    (analytics.bookings || []).forEach((item) => rows.push(['Booking states', item.status, item.count]));
+    (analytics.invoices || []).forEach((item, index) =>
+      rows.push(['Invoice states', `${item.status || 'unknown'}_${index}`, item.count])
+    );
+    (capacities || []).forEach((row, index) => {
+      const total = Number(row.total_kg || 0);
+      const booked = Number(row.booked_kg || 0);
+      const pct = total > 0 ? Math.round((booked / total) * 100) : 0;
+      rows.push([
+        'Published capacity (reallocations list)',
+        `${row.airline || ''} ${String(row.flight_date || '').slice(0, 10)} #${index}`,
+        `${booked}/${total} kg (${pct}%)`
+      ]);
+    });
+    downloadCsvFile(`admin-analytics-overview-${new Date().toISOString().slice(0, 10)}.csv`, header, rows);
+    setMessage('Overview analytics CSV downloaded.');
+  };
+
+  const downloadAdminExporterPerformanceSummaryCsv = () => {
+    const header = ['Exporter_id', 'Exporter', 'Bookings', 'Asked_kg', 'Approved_kg', 'Used_kg', 'Performance_pct'];
+    const rows = (exporterPerformance.summary || []).map((row) => [
+      row.exporter_id,
+      row.exporter_name,
+      row.bookings,
+      row.asked_kg,
+      row.approved_kg,
+      row.used_kg,
+      row.performance_pct
+    ]);
+    downloadCsvFile(
+      `admin-exporter-performance-summary-${new Date().toISOString().slice(0, 10)}.csv`,
+      header,
+      rows
+    );
+    setMessage('Exporter performance summary CSV downloaded.');
+  };
+
+  const downloadAdminExporterPerformanceWeeklyCsv = () => {
+    const header = ['Week', 'Exporter_id', 'Exporter', 'Asked_kg', 'Approved_kg', 'Used_kg', 'Performance_pct'];
+    const rows = (exporterPerformance.weekly || []).map((row) => [
+      row.week,
+      row.exporter_id,
+      row.exporter_name,
+      row.asked_kg,
+      row.approved_kg,
+      row.used_kg,
+      row.performance_pct
+    ]);
+    downloadCsvFile(
+      `admin-exporter-performance-weekly-${new Date().toISOString().slice(0, 10)}.csv`,
+      header,
+      rows
+    );
+    setMessage('Exporter performance weekly CSV downloaded.');
+  };
+
+  const downloadAdminCapacityCrunchCsv = () => {
+    const headerDaily = ['Bucket', 'Day', 'Airline_id', 'Airline', 'Total_kg', 'Booked_kg', 'Free_kg', 'Utilization_pct', 'Crunch_level'];
+    const rowsDaily = (capacityCrunch.daily || []).map((row) => [
+      'daily',
+      String(row.day || '').slice(0, 10),
+      row.airline_id,
+      row.airline,
+      row.total_kg,
+      row.booked_kg,
+      row.free_kg,
+      row.utilization_pct,
+      row.crunch_level
+    ]);
+    downloadCsvFile(
+      `admin-capacity-crunch-daily-${new Date().toISOString().slice(0, 10)}.csv`,
+      headerDaily,
+      rowsDaily
+    );
+    const headerWeekly = ['Bucket', 'Week', 'Airline_id', 'Airline', 'Total_kg', 'Booked_kg', 'Free_kg', 'Utilization_pct', 'Crunch_level'];
+    const rowsWeekly = (capacityCrunch.weekly || []).map((row) => [
+      'weekly',
+      row.week,
+      row.airline_id,
+      row.airline,
+      row.total_kg,
+      row.booked_kg,
+      row.free_kg,
+      row.utilization_pct,
+      row.crunch_level
+    ]);
+    downloadCsvFile(
+      `admin-capacity-crunch-weekly-${new Date().toISOString().slice(0, 10)}.csv`,
+      headerWeekly,
+      rowsWeekly
+    );
+    setMessage('Capacity crunch daily + weekly CSVs downloaded.');
   };
 
   const downloadWeeklyInvoiceExcel = async () => {
@@ -757,7 +826,15 @@ export default function AdminDashboard() {
 
   const resetCapacityForm = () => {
     setEditingCapacityId(null);
-    setCapacityForm({ id: '', airline_id: '', flight_date: '', destination: '', pmc_count: '' });
+    setCapacityForm({
+      id: '',
+      airline_id: '',
+      flight_date: '',
+      destination: '',
+      total_kg: '',
+      total_skids: '',
+      pmc_details: ''
+    });
   };
 
   const startEditCapacityRecord = (capacity) => {
@@ -767,7 +844,9 @@ export default function AdminDashboard() {
       airline_id: capacity.airline_id,
       flight_date: String(capacity.flight_date || '').slice(0, 10),
       destination: capacity.destination || '',
-      pmc_count: String(capacity.total_kg ? (Number(capacity.total_kg) / PMC_STANDARD_KG) : '')
+      total_kg: capacity.total_kg != null ? String(capacity.total_kg) : '',
+      total_skids: capacity.total_skids != null ? String(capacity.total_skids) : '',
+      pmc_details: capacity.pmc_details || ''
     });
     setShowPMCModal(true);
   };
@@ -780,18 +859,25 @@ export default function AdminDashboard() {
   const submitCapacityForm = async (formData) => {
     setModalLoading(true);
     try {
-      const totals = toPmcTotals(formData.pmc_count);
+      const total_kg = Number(formData.total_kg);
+      const total_skids = Number(formData.total_skids);
+      if (!Number.isFinite(total_kg) || total_kg <= 0 || !Number.isFinite(total_skids) || total_skids <= 0) {
+        setMessage('Enter valid total weight (kg) and total skids.');
+        setModalLoading(false);
+        return;
+      }
+
       const payload = {
         airline_id: Number(formData.airline_id),
         flight_date: formData.flight_date,
         destination: formData.destination,
-        total_skids: totals.skids,
-        total_kg: totals.kg,
-        pmc_details: `${Number(formData.pmc_count)} PMC`
+        total_skids,
+        total_kg,
+        pmc_details: (formData.pmc_details || '').trim() || `Manual: ${total_skids} skids / ${total_kg} kg`
       };
 
-      if (!payload.airline_id || !payload.flight_date || !payload.destination || !totals.kg || !totals.skids) {
-        setMessage('Please select airline and direction, then enter a valid PMC count.');
+      if (!payload.airline_id || !payload.flight_date || !payload.destination) {
+        setMessage('Please select airline, flight date, and destination.');
         setModalLoading(false);
         return;
       }
@@ -809,16 +895,74 @@ export default function AdminDashboard() {
   };
 
   const deleteCapacityRecord = async (capacity) => {
-    const ok = window.confirm(`Delete PMC space for ${capacity.airline} on ${String(capacity.flight_date).slice(0, 10)}?`);
+    const ok = window.confirm(`Cancel this published space for ${capacity.airline} on ${String(capacity.flight_date).slice(0, 10)}? This removes the capacity row.`);
     if (!ok) return;
 
     try {
       await api.apiDelete(`/api/capacity/${capacity.id}`);
-      setMessage('PMC space deleted successfully.');
+      setMessage('Space cancelled (record removed).');
       if (editingCapacityId === capacity.id) resetCapacityForm();
       await loadAll();
     } catch (error) {
       setMessage(error.message || 'Failed to delete PMC space');
+    }
+  };
+
+  const submitReduceBooked = async (event) => {
+    event.preventDefault();
+    const capId = Number(reduceForm.capacity_id);
+    const reduced_skids = Number(reduceForm.reduced_skids || 0);
+    const reduced_kg = Number(reduceForm.reduced_kg || 0);
+    if (!Number.isFinite(capId) || capId < 1) {
+      setMessage('Invalid capacity.');
+      return;
+    }
+    if ((!Number.isFinite(reduced_skids) || reduced_skids <= 0) && (!Number.isFinite(reduced_kg) || reduced_kg <= 0)) {
+      setMessage('Enter skids and/or kg to reduce from booked totals.');
+      return;
+    }
+    try {
+      await api.apiPost('/api/capacity/release', {
+        capacity_id: capId,
+        reduced_skids: Math.max(0, reduced_skids),
+        reduced_kg: Math.max(0, reduced_kg)
+      });
+      setMessage('Booked allocation reduced.');
+      setShowReduceModal(false);
+      setReduceForm({ capacity_id: '', reduced_skids: '', reduced_kg: '' });
+      await loadAll();
+    } catch (error) {
+      setMessage(error.message || 'Failed to reduce booked space');
+    }
+  };
+
+  const approveExporterSignup = async (user) => {
+    try {
+      await api.apiPatch(`/api/users/${user.id}/approve-exporter-account`, {});
+      setMessage(`Exporter account activated: ${user.full_name}.`);
+      await loadAll();
+    } catch (error) {
+      setMessage(error.message || 'Failed to approve account');
+    }
+  };
+
+  const saveAdminBookingEdit = async (event) => {
+    event.preventDefault();
+    try {
+      await api.apiPatch(`/api/bookings/${adminEditBookingForm.id}/edit-capacity`, {
+        tonnage_kg: adminEditBookingForm.tonnage_kg ? parseFloat(adminEditBookingForm.tonnage_kg) : undefined,
+        skids: adminEditBookingForm.skids ? parseFloat(adminEditBookingForm.skids) : undefined
+      });
+      setMessage('Booking capacity updated for exporter.');
+      setShowAdminEditBooking(false);
+      setAdminEditBookingForm({ id: '', tonnage_kg: '', skids: '' });
+      await loadAll();
+      if (reallocExporterPick) {
+        const rows = await api.apiGet(`/api/bookings/exporter/${reallocExporterPick}`);
+        setReallocExporterBookings(rows || []);
+      }
+    } catch (error) {
+      setMessage(error.message || 'Failed to update booking');
     }
   };
 
@@ -901,7 +1045,6 @@ export default function AdminDashboard() {
       <div className="sheet-tabs admin-tabs" role="tablist" aria-label="Admin vault tabs">
         <button className={activeTab === 'overview' ? 'active' : ''} onClick={() => setTab('overview')}>Overview</button>
         <button className={activeTab === 'airlines' ? 'active' : ''} onClick={() => setTab('airlines')}>Airlines</button>
-        <button className={activeTab === 'customers' ? 'active' : ''} onClick={() => setTab('customers')}>Customers</button>
         <button className={activeTab === 'finance' ? 'active' : ''} onClick={() => setTab('finance')}>Finance</button>
         <button className={activeTab === 'analytics' ? 'active' : ''} onClick={() => setTab('analytics')}>Analytics</button>
         <button className={activeTab === 'users' ? 'active' : ''} onClick={() => setTab('users')}>Users</button>
@@ -1034,8 +1177,22 @@ export default function AdminDashboard() {
                           <td><span className={`status-pill ${capacity.status}`}>{String(capacity.status || '').toUpperCase()}</span></td>
                           <td>
                             <div className="inline-actions">
-                              <button className="table-action admin-action" onClick={() => startEditCapacityRecord(capacity)}>Edit</button>
-                              <button className="table-action danger admin-action" onClick={() => deleteCapacityRecord(capacity)}>Delete</button>
+                              <button
+                                type="button"
+                                className="table-action admin-action"
+                                onClick={() => {
+                                  setReduceForm({
+                                    capacity_id: String(capacity.id),
+                                    reduced_skids: '',
+                                    reduced_kg: ''
+                                  });
+                                  setShowReduceModal(true);
+                                }}
+                              >
+                                Reduce
+                              </button>
+                              <button type="button" className="table-action admin-action" onClick={() => startEditCapacityRecord(capacity)}>Edit</button>
+                              <button type="button" className="table-action danger admin-action" onClick={() => deleteCapacityRecord(capacity)}>Cancel space</button>
                             </div>
                           </td>
                         </tr>
@@ -1058,159 +1215,6 @@ export default function AdminDashboard() {
         </article>
       ) : null}
 
-      {activeTab === 'customers' ? (
-        <div className="dashboard-grid admin-customers-layout">
-          <article className="panel-card admin-panel admin-customer-form-card">
-            <div className="admin-toolbar">
-              <h3>{editingCustomerId ? 'Edit Customer' : 'Add a Customer'}</h3>
-              {editingCustomerId ? (
-                <button type="button" className="table-action" onClick={resetCustomerForm}>
-                  + New customer
-                </button>
-              ) : null}
-            </div>
-
-            <form className="booking-form compact-form" onSubmit={submitCustomerForm}>
-              <label>
-                Brand name *
-                <input
-                  type="text"
-                  required
-                  value={customerForm.name}
-                  onChange={(event) => setCustomerForm({ ...customerForm, name: event.target.value })}
-                  placeholder="e.g., Garden Fresh"
-                />
-              </label>
-
-              <label>
-                Website
-                <input
-                  type="url"
-                  value={customerForm.website}
-                  onChange={(event) => setCustomerForm({ ...customerForm, website: event.target.value })}
-                  placeholder="https://www.example.com"
-                />
-              </label>
-
-              <label className="full-width">
-                Brand description
-                <textarea
-                  rows="3"
-                  value={customerForm.description}
-                  onChange={(event) => setCustomerForm({ ...customerForm, description: event.target.value })}
-                  placeholder="Short description shown on the homepage card"
-                />
-              </label>
-
-              <label>
-                Sort order
-                <input
-                  type="number"
-                  min="0"
-                  value={customerForm.sort_order}
-                  onChange={(event) => setCustomerForm({ ...customerForm, sort_order: event.target.value })}
-                />
-              </label>
-
-              <label className="checkbox-row">
-                <input
-                  type="checkbox"
-                  checked={customerForm.is_active}
-                  onChange={(event) => setCustomerForm({ ...customerForm, is_active: event.target.checked })}
-                />
-                <span>Visible on homepage</span>
-              </label>
-
-              <label className="full-width">
-                Brand logo {editingCustomerId ? '(leave empty to keep current)' : ''}
-                <input
-                  key={customerFileInputKey}
-                  type="file"
-                  accept="image/*"
-                  onChange={(event) => {
-                    setCustomerLogoFile(event.target.files?.[0] || null);
-                    setRemoveCustomerLogo(false);
-                  }}
-                />
-              </label>
-
-              {editingCustomerId ? (
-                <label className="checkbox-row full-width">
-                  <input
-                    type="checkbox"
-                    checked={removeCustomerLogo}
-                    onChange={(event) => {
-                      setRemoveCustomerLogo(event.target.checked);
-                      if (event.target.checked) setCustomerLogoFile(null);
-                    }}
-                  />
-                  <span>Remove existing logo</span>
-                </label>
-              ) : null}
-
-              <div className="modal-button-group full-width">
-                <button type="submit" className="search-submit">
-                  {editingCustomerId ? 'Save changes' : 'Add customer'}
-                </button>
-                {editingCustomerId ? (
-                  <button type="button" className="table-action" onClick={resetCustomerForm}>
-                    Cancel
-                  </button>
-                ) : null}
-              </div>
-            </form>
-          </article>
-
-          <article className="panel-card admin-panel admin-customer-list-card">
-            <div className="admin-toolbar">
-              <h3>Homepage Customers</h3>
-              <span className="status-pill">{customers.length} total</span>
-            </div>
-
-            {customers.length === 0 ? (
-              <p className="muted-cell">No customers yet — add one on the left.</p>
-            ) : (
-              <div className="admin-customer-grid">
-                {customers.map((customer) => (
-                  <article key={customer.id} className={`admin-customer-card${customer.is_active ? '' : ' is-hidden'}`}>
-                    <div className="admin-customer-logo">
-                      {customer.logo ? (
-                        <img src={customer.logo} alt={`${customer.name} logo`} />
-                      ) : (
-                        <div className="admin-customer-logo-placeholder">
-                          {String(customer.name || '?').slice(0, 1).toUpperCase()}
-                        </div>
-                      )}
-                    </div>
-                    <div className="admin-customer-body">
-                      <div className="admin-customer-head">
-                        <strong>{customer.name}</strong>
-                        <span className={`status-pill ${customer.is_active ? 'live' : 'pending'}`}>
-                          {customer.is_active ? 'Visible' : 'Hidden'}
-                        </span>
-                      </div>
-                      {customer.description ? <p>{customer.description}</p> : null}
-                      {customer.website ? (
-                        <a className="admin-customer-link" href={customer.website} target="_blank" rel="noopener noreferrer">
-                          {customer.website}
-                        </a>
-                      ) : null}
-                      <div className="admin-customer-actions">
-                        <button type="button" className="table-action" onClick={() => startEditCustomer(customer)}>Edit</button>
-                        <button type="button" className="table-action" onClick={() => toggleCustomerActive(customer)}>
-                          {customer.is_active ? 'Hide' : 'Show'}
-                        </button>
-                        <button type="button" className="admin-action danger" onClick={() => removeCustomer(customer)}>Remove</button>
-                      </div>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            )}
-          </article>
-        </div>
-      ) : null}
-
       {activeTab === 'finance' ? (
         <div className="dashboard-grid finance-layout">
           <article className="panel-card admin-panel finance-pricing-card">
@@ -1225,7 +1229,12 @@ export default function AdminDashboard() {
                     setPricingForm({
                       ...pricingForm,
                       exporter_id: e.target.value,
-                      price_per_kg: selected?.price_per_kg ? String(selected.price_per_kg) : pricingForm.price_per_kg,
+                      price_per_kg: selected?.price_per_kg != null ? String(selected.price_per_kg) : pricingForm.price_per_kg,
+                      pricing_model: selected?.pricing_model === 'per_awb' ? 'per_awb' : 'per_kg',
+                      price_per_awb:
+                        selected?.price_per_awb != null && selected?.price_per_awb !== ''
+                          ? String(selected.price_per_awb)
+                          : '',
                       currency: selected?.currency || 'USD',
                       notes: selected?.notes || ''
                     });
@@ -1236,6 +1245,16 @@ export default function AdminDashboard() {
                   {(exporterCompanies || []).map((ex) => (
                     <option key={ex.id} value={ex.id}>{ex.name}</option>
                   ))}
+                </select>
+              </label>
+              <label>
+                Pricing model *
+                <select
+                  value={pricingForm.pricing_model}
+                  onChange={(e) => setPricingForm({ ...pricingForm, pricing_model: e.target.value })}
+                >
+                  <option value="per_kg">Per kg</option>
+                  <option value="per_awb">Per AWB line (distinct AWBs on uplift notifications)</option>
                 </select>
               </label>
               <label>
@@ -1250,6 +1269,32 @@ export default function AdminDashboard() {
                   required
                 />
               </label>
+              {pricingForm.pricing_model === 'per_awb' ? (
+                <label>
+                  Price per AWB line *
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={pricingForm.price_per_awb}
+                    onChange={(e) => setPricingForm({ ...pricingForm, price_per_awb: e.target.value })}
+                    placeholder="e.g. 150.00"
+                    required
+                  />
+                </label>
+              ) : (
+                <label>
+                  Price per AWB (optional, stored for later)
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={pricingForm.price_per_awb}
+                    onChange={(e) => setPricingForm({ ...pricingForm, price_per_awb: e.target.value })}
+                    placeholder="—"
+                  />
+                </label>
+              )}
               <label>
                 Currency
                 <select
@@ -1273,7 +1318,22 @@ export default function AdminDashboard() {
               </label>
               <div className="modal-button-group full-width">
                 <button type="submit" className="search-submit">💾 Save price</button>
-                <button type="button" className="table-action" onClick={() => setPricingForm({ exporter_id: '', price_per_kg: '', currency: 'USD', notes: '' })}>Clear</button>
+                <button
+                  type="button"
+                  className="table-action"
+                  onClick={() =>
+                    setPricingForm({
+                      exporter_id: '',
+                      price_per_kg: '',
+                      pricing_model: 'per_kg',
+                      price_per_awb: '',
+                      currency: 'USD',
+                      notes: ''
+                    })
+                  }
+                >
+                  Clear
+                </button>
               </div>
             </form>
 
@@ -1284,7 +1344,14 @@ export default function AdminDashboard() {
                   {exporterPricing.map((row) => (
                     <li key={row.exporter_id}>
                       <strong>{row.exporter_name}</strong>
-                      <span>{row.currency || 'USD'} {Number(row.price_per_kg).toFixed(2)} / kg</span>
+                      <span>
+                        {row.pricing_model === 'per_awb' && row.price_per_awb != null
+                          ? `${row.currency || 'USD'} ${Number(row.price_per_awb).toFixed(2)} / AWB line`
+                          : `${row.currency || 'USD'} ${Number(row.price_per_kg).toFixed(2)} / kg`}
+                        {row.pricing_model === 'per_awb' ? (
+                          <small className="muted-cell"> (fallback kg rate {Number(row.price_per_kg).toFixed(2)})</small>
+                        ) : null}
+                      </span>
                       {row.notes ? <small className="muted-cell">{row.notes}</small> : null}
                     </li>
                   ))}
@@ -1499,6 +1566,21 @@ export default function AdminDashboard() {
 
       {activeTab === 'analytics' ? (
         <div className="dashboard-grid analytics-layout">
+          <div className="invoice-filter-bar" style={{ gridColumn: '1 / -1' }}>
+            <span className="muted-cell">CSV exports (same datasets as airline / exporter performance views)</span>
+            <button type="button" className="table-action ghost" onClick={downloadAdminAnalyticsOverviewCsv}>
+              Overview + capacity snapshot
+            </button>
+            <button type="button" className="table-action ghost" onClick={downloadAdminExporterPerformanceSummaryCsv}>
+              Exporter performance summary
+            </button>
+            <button type="button" className="table-action ghost" onClick={downloadAdminExporterPerformanceWeeklyCsv}>
+              Exporter performance weekly
+            </button>
+            <button type="button" className="table-action ghost" onClick={downloadAdminCapacityCrunchCsv}>
+              Capacity crunch (2 files)
+            </button>
+          </div>
           <article className="panel-card admin-panel">
             <h3>Role Distribution</h3>
             <div className="inline-tags">
@@ -1651,6 +1733,7 @@ export default function AdminDashboard() {
                     <th>Name</th>
                     <th>Email</th>
                     <th>Role</th>
+                    <th>Active</th>
                     <th>Lock</th>
                     <th>Edit</th>
                     <th>Delete</th>
@@ -1664,6 +1747,18 @@ export default function AdminDashboard() {
                       <td>{user.full_name}</td>
                       <td>{user.email}</td>
                       <td><span className="status-pill">{String(user.role || '').replace('_', ' ')}</span></td>
+                      <td>
+                        {Number(user.is_active) === 1 ? (
+                          <span className="status-pill confirmed">Yes</span>
+                        ) : (
+                          <span className="status-pill pending">Pending</span>
+                        )}
+                        {user.role === 'exporter' && Number(user.is_active) !== 1 ? (
+                          <button type="button" className="table-action admin-action success" style={{ marginLeft: 6 }} onClick={() => approveExporterSignup(user)}>
+                            Approve
+                          </button>
+                        ) : null}
+                      </td>
                       <td>
                         <button
                           className={`table-action admin-action ${user.is_locked ? 'success' : 'danger'}`}
@@ -1694,7 +1789,7 @@ export default function AdminDashboard() {
                       </td>
                     </tr>
                   ))}
-                  {!users.length ? <tr><td colSpan="8">No users found.</td></tr> : null}
+                  {!users.length ? <tr><td colSpan="9">No users found.</td></tr> : null}
                 </tbody>
               </table>
             </div>
@@ -1737,6 +1832,77 @@ export default function AdminDashboard() {
       {activeTab === 'reallocations' ? (
         <article className="panel-card admin-panel">
           <h3>Available Space</h3>
+          <div className="inline-actions" style={{ marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <label>
+              Exporter company
+              <select
+                value={reallocExporterPick}
+                onChange={(e) => setReallocExporterPick(e.target.value)}
+                style={{ minWidth: 220 }}
+              >
+                <option value="">— Select exporter —</option>
+                {(exporterCompanies || []).map((ex) => (
+                  <option key={ex.id} value={String(ex.id)}>{ex.name}</option>
+                ))}
+              </select>
+            </label>
+            <span className="muted-cell">View approved / pending bookings and adjust kg or skids when an exporter requests a correction.</span>
+          </div>
+
+          {reallocExporterPick ? (
+            <div className="table-wrap" style={{ marginBottom: '1.5rem' }}>
+              <table className="admin-management-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Airline</th>
+                    <th>Flight</th>
+                    <th>Destination</th>
+                    <th>Status</th>
+                    <th>Skids</th>
+                    <th>KG</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reallocExporterBookings.length ? reallocExporterBookings.map((b) => (
+                    <tr key={b.id}>
+                      <td>#{b.id}</td>
+                      <td>{b.airline_name || '—'}</td>
+                      <td>{String(b.flight_date || '').slice(0, 10)}</td>
+                      <td>{b.destination || '—'}</td>
+                      <td><span className={`status-pill ${b.status}`}>{String(b.status || '').toUpperCase()}</span></td>
+                      <td>{b.skids}</td>
+                      <td>{Number(b.tonnage_kg || 0).toLocaleString('en-US')}</td>
+                      <td>
+                        {['pending', 'approved'].includes(String(b.status || '').toLowerCase()) ? (
+                          <button
+                            type="button"
+                            className="table-action admin-action"
+                            onClick={() => {
+                              setAdminEditBookingForm({
+                                id: String(b.id),
+                                tonnage_kg: String(b.tonnage_kg ?? ''),
+                                skids: String(b.skids ?? '')
+                              });
+                              setShowAdminEditBooking(true);
+                            }}
+                          >
+                            Edit booking
+                          </button>
+                        ) : (
+                          <span className="muted-cell">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  )) : (
+                    <tr><td colSpan="8">No bookings for this exporter.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+
           <div className="table-wrap">
             <table>
               <thead>
@@ -1835,7 +2001,7 @@ export default function AdminDashboard() {
                 >
                   <option value="exporter">Exporter</option>
                   <option value="airline_analyst">Airline Analyst</option>
-                  <option value="airline_supervisor">Airline Supervisor</option>
+                  <option value="airline_supervisor">Acceptance Team</option>
                   <option value="clearing_agent">Clearing Agent</option>
                   {isMainAdmin ? <option value="admin">Admin</option> : null}
                 </select>
@@ -2187,6 +2353,82 @@ export default function AdminDashboard() {
         directions={managerDirectionOptions}
         loading={modalLoading}
       />
+
+      {showAdminEditBooking ? (
+        <div className="admin-modal-overlay" role="dialog" aria-label="Admin edit booking">
+          <div className="admin-modal compact-modal">
+            <h3>Edit booking #{adminEditBookingForm.id}</h3>
+            <form className="booking-form compact-form" onSubmit={saveAdminBookingEdit}>
+              <label>
+                Tonnage (kg)
+                <input
+                  type="number"
+                  step="0.01"
+                  value={adminEditBookingForm.tonnage_kg}
+                  onChange={(e) => setAdminEditBookingForm({ ...adminEditBookingForm, tonnage_kg: e.target.value })}
+                  required
+                />
+              </label>
+              <label>
+                Skids
+                <input
+                  type="number"
+                  step="0.01"
+                  value={adminEditBookingForm.skids}
+                  onChange={(e) => setAdminEditBookingForm({ ...adminEditBookingForm, skids: e.target.value })}
+                  required
+                />
+              </label>
+              <div className="modal-button-group full-width">
+                <button type="submit" className="search-submit admin-submit">Save</button>
+                <button type="button" className="table-action admin-action" onClick={() => setShowAdminEditBooking(false)}>Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
+
+      {showReduceModal ? (
+        <div className="smart-grid-modal-overlay" role="presentation">
+          <div className="smart-grid-modal" role="dialog" aria-label="Reduce booked space">
+            <div className="smart-grid-head">
+              <h4>Reduce booked allocation</h4>
+              <button type="button" className="close-btn" onClick={() => setShowReduceModal(false)} aria-label="Close">✕</button>
+            </div>
+            <form className="booking-form compact-form" onSubmit={submitReduceBooked}>
+              <p className="muted-cell" style={{ marginTop: 0 }}>
+                Lowers <strong>booked</strong> skids and/or kg on this capacity row (e.g. after a no-show). Totals for the lane stay the same.
+              </p>
+              <label>
+                Reduce booked skids
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={reduceForm.reduced_skids}
+                  onChange={(e) => setReduceForm({ ...reduceForm, reduced_skids: e.target.value })}
+                  placeholder="0"
+                />
+              </label>
+              <label>
+                Reduce booked kg
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={reduceForm.reduced_kg}
+                  onChange={(e) => setReduceForm({ ...reduceForm, reduced_kg: e.target.value })}
+                  placeholder="0"
+                />
+              </label>
+              <div className="modal-button-group full-width">
+                <button type="submit" className="search-submit">Apply reduction</button>
+                <button type="button" className="table-action" onClick={() => setShowReduceModal(false)}>Close</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
     </DashboardShell>
   );
 }

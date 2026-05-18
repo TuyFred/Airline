@@ -1,6 +1,15 @@
 const express = require("express");
 const { body } = require("express-validator");
-const { listUsers, listLockHistory, getUser, lockOrUnlockUser, createUser, updateUser, deleteUser } = require("../controllers/usersController");
+const {
+  listUsers,
+  listLockHistory,
+  getUser,
+  lockOrUnlockUser,
+  createUser,
+  updateUser,
+  deleteUser,
+  approvePendingExporterAccount
+} = require("../controllers/usersController");
 const { authRequired, requireRoles } = require("../Midleware/auth");
 const { handleValidation } = require("../Midleware/validate");
 
@@ -36,6 +45,7 @@ router.patch(
 	handleValidation,
 	lockOrUnlockUser
 );
+router.patch("/:id/approve-exporter-account", approvePendingExporterAccount);
 router.patch(
 	"/:id",
 	body("full_name").trim().notEmpty(),

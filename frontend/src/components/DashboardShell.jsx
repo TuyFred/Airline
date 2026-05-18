@@ -26,15 +26,14 @@ const roleSidebarConfig = {
   },
   airline_supervisor: {
     nav: [
-      { label: 'Final Decisions',         href: '#dashboard/supervisor?tab=decisions',    icon: '⚖️' },
-      { label: 'Uplift Updates',          href: '#dashboard/supervisor?tab=uplift',        icon: '🚀' }
+      { label: 'Acceptance queue', href: '#dashboard/supervisor?tab=decisions', icon: '⚖️' },
+      { label: 'Uplift confirmation', href: '#dashboard/supervisor?tab=uplift', icon: '🚀' }
     ]
   },
   clearing_agent: {
     nav: [
-      { label: 'Dashboard Overview', href: '#dashboard/agent?view=overview',  icon: '📊' },
-      { label: 'Submit Uplift',      href: '#dashboard/agent?view=submit',    icon: '📤' },
-      { label: 'Document Vault',     href: '#dashboard/agent?view=documents', icon: '📄' }
+      { label: 'Submit acceptance', href: '#dashboard/agent?view=submit', icon: '📤' },
+      { label: 'Document Vault', href: '#dashboard/agent?view=documents', icon: '📄' }
     ]
   },
   admin: {

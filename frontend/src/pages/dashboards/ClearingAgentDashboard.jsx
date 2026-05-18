@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import DashboardShell from '../../components/DashboardShell';
 import Pagination, { usePagination } from '../../components/Pagination';
 import DocumentPreview from '../../components/DocumentPreview';
@@ -49,10 +49,8 @@ function formatBookingOption(b) {
 }
 
 export default function ClearingAgentDashboard() {
-  const [activeView, setActiveView] = useState('overview');
-  const [summary, setSummary] = useState({});
+  const [activeView, setActiveView] = useState('documents');
   const [documents, setDocuments] = useState([]);
-  const [bookings, setBookings] = useState([]);
   const [exporters, setExporters] = useState([]);
   const [selectedDocument, setSelectedDocument] = useState(null);
   const [submitForm, setSubmitForm] = useState(initialSubmit);
@@ -67,21 +65,6 @@ export default function ClearingAgentDashboard() {
   const documentsPager = usePagination(documents, 5);
   const documentRows = documentsPager.pagedItems;
 
-  const pendingBookings = useMemo(
-    () => bookings.filter((booking) => String(booking.status || '').toLowerCase() === 'pending').length,
-    [bookings]
-  );
-
-  const confirmedBookings = useMemo(
-    () => bookings.filter((booking) => String(booking.status || '').toLowerCase() === 'approved').length,
-    [bookings]
-  );
-
-  const docsToday = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    return documents.filter((doc) => String(doc.created_at || '').slice(0, 10) === today).length;
-  }, [documents]);
-
   const loadAll = async () => {
     try {
       const [dashboardData, docs, exportersData] = await Promise.all([
@@ -89,8 +72,6 @@ export default function ClearingAgentDashboard() {
         api.apiGet('/api/documents'),
         api.apiGet('/api/public/exporters')
       ]);
-      setSummary(dashboardData.summary || {});
-      setBookings(dashboardData.bookings || []);
       setDocuments(docs || []);
       setExporters(exportersData || []);
       documentsPager.setPage(1);
@@ -109,10 +90,10 @@ export default function ClearingAgentDashboard() {
       const queryPart = hash.includes('?') ? hash.split('?')[1] : '';
       const params = new URLSearchParams(queryPart);
       const view = params.get('view');
-      const allowed = ['overview', 'submit', 'documents'];
+      const allowed = ['submit', 'documents'];
 
       if (!view || !allowed.includes(view)) {
-        window.location.hash = '#dashboard/agent?view=overview';
+        window.location.hash = '#dashboard/agent?view=documents';
         return;
       }
       setActiveView(view);
@@ -183,12 +164,12 @@ export default function ClearingAgentDashboard() {
     const wantsDocs = submitForm.files.length > 0;
 
     if (!wantsKg && !wantsDocs) {
-      setMessage('Add at least an uplift kg confirmation or one document to upload.');
+      setMessage('Add at least a kg confirmation for acceptance, or upload one document.');
       return;
     }
 
     if (wantsKg && !submitForm.booking_id) {
-      setMessage('Booking ID is required to confirm uplift kg.');
+      setMessage('Booking ID is required to record acceptance kg.');
       return;
     }
 
@@ -217,17 +198,17 @@ export default function ClearingAgentDashboard() {
 
       const messages = [];
       if (wantsDocs) messages.push(submitForm.files.length > 1 ? 'Documents merged & uploaded.' : 'Document uploaded.');
-      if (wantsKg) messages.push(`Uplift kg confirmed for booking #${submitForm.booking_id}.`);
+      if (wantsKg) messages.push(`Acceptance kg recorded for booking #${submitForm.booking_id}.`);
       setMessage(messages.join(' '));
 
       setSubmitForm(initialSubmit);
       setExporterBookings([]);
       setUseManualBookingId(false);
       setShowSubmitModal(false);
-      window.location.hash = '#dashboard/agent?view=overview';
+      window.location.hash = '#dashboard/agent?view=documents';
       await loadAll();
     } catch (error) {
-      setMessage(error.message || 'Failed to submit uplift');
+      setMessage(error.message || 'Failed to submit acceptance');
     } finally {
       setSubmitting(false);
     }
@@ -249,8 +230,8 @@ export default function ClearingAgentDashboard() {
   const closeSubmitModal = () => {
     setShowSubmitModal(false);
     if (activeView === 'submit') {
-      window.location.hash = '#dashboard/agent?view=overview';
-      setActiveView('overview');
+      window.location.hash = '#dashboard/agent?view=documents';
+      setActiveView('documents');
     }
   };
 
@@ -267,60 +248,22 @@ export default function ClearingAgentDashboard() {
   return (
     <DashboardShell
       role="Clearing Agent"
-      title="Documents & Uplift Confirmation"
+      title="Documents & acceptance confirmation"
       subtitle=""
       accent="dashboard-agent"
       sidebarSummary=""
     >
       <div className="sheet-tabs" role="tablist" aria-label="Clearing agent views">
-        <button className={activeView === 'overview' ? 'active' : ''} onClick={() => setView('overview')}>Overview</button>
-        <button className={activeView === 'submit' ? 'active' : ''} onClick={openSubmitModal}>Submit Uplift</button>
+        <button className={activeView === 'submit' ? 'active' : ''} onClick={openSubmitModal}>Submit acceptance</button>
         <button className={activeView === 'documents' ? 'active' : ''} onClick={() => setView('documents')}>Document Vault</button>
       </div>
-
-      {activeView === 'overview' ? (
-      <div className="dashboard-grid metrics-grid">
-        <article className="metric-card">
-          <span>Docs Pending</span>
-          <strong>{toNumber(summary.docsPending)}</strong>
-        </article>
-        <article className="metric-card">
-          <span>Shipments</span>
-          <strong>{toNumber(summary.shipments)}</strong>
-        </article>
-        <article className="metric-card">
-          <span>Linked Exporters</span>
-          <strong>{toNumber(summary.exportersLinked)}</strong>
-        </article>
-        <article className="metric-card">
-          <span>Pending Bookings</span>
-          <strong>{pendingBookings}</strong>
-        </article>
-        <article className="metric-card">
-          <span>Confirmed Bookings</span>
-          <strong>{confirmedBookings}</strong>
-        </article>
-        <article className="metric-card">
-          <span>Uploaded Today</span>
-          <strong>{docsToday}</strong>
-        </article>
-        <article className="metric-card">
-          <span>My Documents</span>
-          <strong>{documents.length}</strong>
-        </article>
-        <article className="metric-card metric-card-cta">
-          <span>Quick Action</span>
-          <button type="button" className="search-submit" onClick={openSubmitModal}>+ Submit Uplift</button>
-        </article>
-      </div>
-      ) : null}
 
       {activeView === 'documents' ? (
       <div className="dashboard-grid single-panel-grid">
         <article className="panel-card full-width" ref={documentsRef}>
           <div className="admin-toolbar">
             <h3>Document Vault</h3>
-            <button type="button" className="search-submit" onClick={openSubmitModal}>+ Submit Uplift</button>
+            <button type="button" className="search-submit" onClick={openSubmitModal}>+ Submit acceptance</button>
           </div>
           <div className="document-list">
             {documentRows.map((doc) => (
@@ -360,9 +303,9 @@ export default function ClearingAgentDashboard() {
 
       {showSubmitModal ? (
         <div className="smart-grid-modal-overlay">
-          <div className="smart-grid-modal submit-uplift-modal" role="dialog" aria-label="Submit uplift">
+          <div className="smart-grid-modal submit-uplift-modal" role="dialog" aria-label="Submit acceptance">
             <div className="smart-grid-head">
-              <h4>Submit Uplift — Documents & Confirmation</h4>
+              <h4>Submit acceptance — documents and kg confirmation</h4>
               <button className="close-btn" type="button" onClick={closeSubmitModal} aria-label="Close">✕</button>
             </div>
             <form className="booking-form submit-uplift-form" onSubmit={submitUplift}>
@@ -461,7 +404,7 @@ export default function ClearingAgentDashboard() {
               </label>
 
               <label>
-                Actual Uplift (kg)
+                Uplifted weight for invoice (kg)
                 <input
                   type="number"
                   min="0"
@@ -500,7 +443,7 @@ export default function ClearingAgentDashboard() {
 
               <div className="modal-button-group full-width">
                 <button className="search-submit" type="submit" disabled={submitting}>
-                  {submitting ? 'Submitting…' : 'Submit Uplift'}
+                  {submitting ? 'Submitting…' : 'Submit acceptance'}
                 </button>
                 <button className="table-action" type="button" onClick={closeSubmitModal} disabled={submitting}>Cancel</button>
               </div>

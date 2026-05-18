@@ -259,6 +259,8 @@ async function runMigrations() {
         id INT AUTO_INCREMENT PRIMARY KEY,
         exporter_id INT NOT NULL UNIQUE,
         price_per_kg DECIMAL(10,4) NOT NULL DEFAULT 5.0000,
+        pricing_model ENUM('per_kg','per_awb') NOT NULL DEFAULT 'per_kg',
+        price_per_awb DECIMAL(10,4) NULL,
         currency VARCHAR(8) NOT NULL DEFAULT 'USD',
         notes VARCHAR(255) NULL,
         updated_by INT NULL,
@@ -266,6 +268,12 @@ async function runMigrations() {
         CONSTRAINT fk_pricing_exporter FOREIGN KEY (exporter_id) REFERENCES exporters(id) ON DELETE CASCADE
       )
     `);
+    await addColumnIfMissing(
+      "exporter_pricing",
+      "pricing_model",
+      "ENUM('per_kg','per_awb') NOT NULL DEFAULT 'per_kg'"
+    );
+    await addColumnIfMissing("exporter_pricing", "price_per_awb", "DECIMAL(10,4) NULL");
 
     console.log("Migrations applied successfully.");
   } catch (err) {

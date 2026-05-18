@@ -6,7 +6,7 @@ export default function OurServices() {
     {
       icon: '📊',
       title: 'Real-Time Booking & Capacity Management',
-      description: 'Submit simple bookings (skids, tonnage, commodity) via our secure platform; view live public airline capacity and claim released space instantly.'
+      description: 'Submit simple bookings (skids, tonnage, and commodity) through our secure platform, view live airline capacity, and instantly claim released space.'
     },
     {
       icon: '🔄',
@@ -16,12 +16,12 @@ export default function OurServices() {
     {
       icon: '✈️',
       title: 'Airline Liaison & Confirmation',
-      description: 'Act as your dedicated coordinator: submit requests, secure allocations, provide daily 9 AM load confirmations, and handle communications with all carriers.'
+      description: 'Act as your dedicated coordinator: submit requests, secure allocations, provide daily 9:00 AM load confirmations, and handle communication with all carriers.'
     },
     {
       icon: '🔒',
       title: 'Document Vault & Compliance',
-      description: 'Secure upload/storage of AWBs, phytosanitary certificates, COO, and other documents; generate shareable links for buyers or agents.'
+      description: 'Securely upload and store AWBs, phytosanitary certificates, COO, and other documents, and generate shareable links for buyers or agents.'
     }
   ];
 

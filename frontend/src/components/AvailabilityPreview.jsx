@@ -6,7 +6,7 @@ export default function AvailabilityPreview() {
   const roleViews = [
     { role: 'Exporter', note: 'Book, view public space availability, upload docs, confirm 9 AM uplift' },
     { role: 'Airline Analyst', note: 'Review bookings, analyze demand vs capacity, suggest allocation changes' },
-    { role: 'Airline Supervisor', note: 'Final approval, uplift/offload control, send template or custom notifications' },
+    { role: 'Acceptance Team', note: 'Final acceptance, uplift/offload control, send template or custom notifications' },
     { role: 'Clearing Agent', note: 'Upload AWB, Phyto, COO, Acceptance Docket, packing list, invoice' },
     { role: 'SBU Admin', note: 'Lock accounts, override reallocations, manage finance and analytics' }
   ];

@@ -8,6 +8,30 @@ import { getDirectionOptions } from '../../utils/pmcPlanning';
 const AIRLINES = ['RwandAir', 'Ethiopian', 'KLM', 'Qatar', 'Kenya Airways', 'Brussels', 'Turkish', 'EgyptAir'];
 const ANALYST_TABS = ['requests', 'capacity', 'uplift', 'analytics', 'performance', 'daily'];
 
+function parsePendingIncreaseRequest(pendingReason) {
+  const m = String(pendingReason || '').match(/PENDING_INC:([\d.]+):([\d.]+)/);
+  if (!m) return null;
+  return { skids: m[1], tonnage_kg: m[2] };
+}
+
+function csvEscapeCell(v) {
+  const s = String(v ?? '');
+  if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+function downloadCsvFile(filename, headerRow, dataRows) {
+  const lines = [headerRow.map(csvEscapeCell).join(',')];
+  for (const row of dataRows) lines.push(row.map(csvEscapeCell).join(','));
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function AirlineDashboard() {
   const [activeAirline, setActiveAirline] = useState('RwandAir');
   const [activeTab, setActiveTab] = useState('requests');
@@ -21,24 +45,10 @@ export default function AirlineDashboard() {
 
   const [showRescheduleModal, setShowRescheduleModal] = useState(false);
   const [showEditCapacityModal, setShowEditCapacityModal] = useState(false);
-  const [showUpliftModal, setShowUpliftModal] = useState(false);
   const [showSpacePublicationModal, setShowSpacePublicationModal] = useState(false);
 
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
-
-  const [upliftForm, setUpliftForm] = useState({
-    bookingId: '',
-    actual_kg: '',
-    awb_number: '',
-    awb_type: 'house',
-    uplift_type: 'full',
-    explanation: '',
-    message: '',
-    kg_confirmation: '',
-    document: null,
-    reason: ''
-  });
 
   const [rescheduleForm, setRescheduleForm] = useState({
     bookingId: '',
@@ -63,13 +73,15 @@ export default function AirlineDashboard() {
     pmc_count: ''
   });
   const [generalNotificationForm, setGeneralNotificationForm] = useState({
-    exporter_id: '',
+    selectedExporterIds: [],
+    selectAllExporters: false,
     title: '',
     message: '',
     send_email: true,
     send_whatsapp: true
   });
   const [rowDecisions, setRowDecisions] = useState({});
+  const [pendingAllocDecisions, setPendingAllocDecisions] = useState({});
 
   const allBookings = useMemo(() => Object.values(bookingsByExporter).flat(), [bookingsByExporter]);
   const filteredBookingsByExporter = useMemo(() => {
@@ -87,16 +99,6 @@ export default function AirlineDashboard() {
   );
   const approvedCount = useMemo(() => allBookings.filter((row) => row.status === 'approved').length, [allBookings]);
   const rejectedCount = useMemo(() => allBookings.filter((row) => row.status === 'rejected').length, [allBookings]);
-  const upliftBookingOptions = useMemo(() => {
-    const source = selectedExporterFilter
-      ? allBookings.filter((row) => row.exporter === selectedExporterFilter)
-      : allBookings;
-    return source.filter((row) => ['approved', 'pending'].includes(String(row.status || '').toLowerCase()));
-  }, [allBookings, selectedExporterFilter]);
-  const selectedUpliftBooking = useMemo(
-    () => allBookings.find((row) => String(row.id) === String(upliftForm.bookingId)),
-    [allBookings, upliftForm.bookingId]
-  );
   const unreadNotifications = useMemo(() => notifications.filter((row) => Number(row.is_read) !== 1).length, [notifications]);
   const exporterPerformance = useMemo(() => {
     const source = filteredBookings.length ? filteredBookings : allBookings;
@@ -127,20 +129,6 @@ export default function AirlineDashboard() {
 
   const exporterDistributionRows = useMemo(() => Object.entries(bookingsByExporter), [bookingsByExporter]);
   const notificationsPager = usePagination(notifications, 5);
-
-  useEffect(() => {
-    if (!showUpliftModal) return;
-    if (upliftForm.bookingId) return;
-    if (!upliftBookingOptions.length) return;
-    const preferred = upliftBookingOptions.find((row) => String(row.status || '').toLowerCase() === 'approved') || upliftBookingOptions[0];
-    setUpliftForm((prev) => ({ ...prev, bookingId: String(preferred.id) }));
-  }, [showUpliftModal, upliftForm.bookingId, upliftBookingOptions]);
-
-  useEffect(() => {
-    if (!showUpliftModal || !selectedUpliftBooking?.exporter) return;
-    if (selectedExporterFilter === selectedUpliftBooking.exporter) return;
-    setSelectedExporterFilter(selectedUpliftBooking.exporter);
-  }, [showUpliftModal, selectedUpliftBooking, selectedExporterFilter]);
 
   const categorizedNotifications = useMemo(() => {
     const reduced = [];
@@ -270,6 +258,57 @@ export default function AirlineDashboard() {
     }
   };
 
+  const downloadSevenDayPerformanceCsv = () => {
+    const header = ['Day', 'Label', 'PlannedKg', 'ConfirmedKg', 'UsedKg', 'Skids', 'Exporters', 'DayPerformancePct', 'BookingId', 'Exporter', 'Destination', 'TonnageKg'];
+    const rows = [];
+    for (const day of sevenDayBreakdown) {
+      if (!day.rows.length) {
+        rows.push([day.day, day.label, day.plannedKg, day.confirmedKg, day.usedKg, day.skids, day.exporters, day.performance, '', '', '', '']);
+      } else {
+        for (const b of day.rows) {
+          rows.push([
+            day.day,
+            day.label,
+            day.plannedKg,
+            day.confirmedKg,
+            day.usedKg,
+            day.skids,
+            day.exporters,
+            day.performance,
+            b.id,
+            b.exporter,
+            b.destination,
+            b.tonnage_kg
+          ]);
+        }
+      }
+    }
+    downloadCsvFile(`seven-day-performance-${activeAirline}-${new Date().toISOString().slice(0, 10)}.csv`, header, rows);
+    setMessage('7-day performance CSV downloaded.');
+  };
+
+  const downloadWeeklyExporterSummaryCsv = () => {
+    const header = ['Exporter', 'AllocatedKg', 'ApprovedKg', 'ConfirmedKg', 'UsedKg', 'Bookings', 'PerformancePct'];
+    const rows = weeklyExporterSummary.map((r) => [
+      r.exporter,
+      r.allocatedKg,
+      r.approvedKg,
+      r.confirmedKg,
+      r.usedKg,
+      r.bookings,
+      r.performance
+    ]);
+    downloadCsvFile(`weekly-exporter-summary-${activeAirline}.csv`, header, rows);
+    setMessage('Weekly exporter summary CSV downloaded.');
+  };
+
+  const downloadProductPerformanceCsv = () => {
+    const header = ['Commodity', 'Kg', 'Skids', 'Count', 'Percent'];
+    const rows = (exporterPerformance.products || []).map((p) => [p.commodity, p.kg, p.skids, p.count, p.percent]);
+    downloadCsvFile(`product-performance-${activeAirline}.csv`, header, rows);
+    setMessage('Product performance CSV downloaded.');
+  };
+
   const [knownCapacityDestinations, setKnownCapacityDestinations] = useState([]);
 
   const destinationSuggestions = useMemo(() => {
@@ -381,64 +420,6 @@ export default function AirlineDashboard() {
     }
   };
 
-  const handleUpliftSubmit = async (event) => {
-    event.preventDefault();
-    try {
-      if (!upliftForm.bookingId || !upliftForm.actual_kg || !upliftForm.awb_number) {
-        setMessage('Please fill Booking ID, Actual KG, and AWB Number.');
-        return;
-      }
-
-      if (['half', 'offload'].includes(upliftForm.uplift_type) && !String(upliftForm.explanation || '').trim()) {
-        setMessage('Explanation is required for half uplift or offload.');
-        return;
-      }
-
-      const formData = new FormData();
-      formData.append('actual_kg', String(parseFloat(upliftForm.actual_kg)));
-      formData.append('awb_number', upliftForm.awb_number);
-      formData.append('awb_type', upliftForm.awb_type);
-      formData.append('uplift_type', upliftForm.uplift_type);
-      formData.append('explanation', upliftForm.explanation || '');
-      formData.append('message', upliftForm.message || '');
-      formData.append('kg_confirmation', upliftForm.kg_confirmation ? String(parseFloat(upliftForm.kg_confirmation)) : '');
-      formData.append('reason', upliftForm.reason || '');
-      if (upliftForm.document) formData.append('document', upliftForm.document);
-
-      const token = localStorage.getItem('sbu_token');
-      const response = await fetch(`${api.API_BASE}/api/bookings/${upliftForm.bookingId}/uplift-notification`, {
-        method: 'POST',
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
-        },
-        body: formData
-      });
-
-      if (!response.ok) {
-        const payload = await response.json().catch(() => ({}));
-        throw new Error(payload.message || 'Failed to submit uplift notification');
-      }
-
-      setMessage('Uplift update submitted successfully.');
-      setUpliftForm({
-        bookingId: '',
-        actual_kg: '',
-        awb_number: '',
-        awb_type: 'house',
-        uplift_type: 'full',
-        explanation: '',
-        message: '',
-        kg_confirmation: '',
-        document: null,
-        reason: ''
-      });
-      setShowUpliftModal(false);
-      await loadBookingsForAirline(activeAirline);
-    } catch (error) {
-      setMessage(error.message || 'Failed to submit uplift update');
-    }
-  };
-
   const applyRowDecision = async (booking) => {
     const choice = rowDecisions[booking.id];
     if (!choice) {
@@ -461,33 +442,86 @@ export default function AirlineDashboard() {
     }
   };
 
-  const approvePendingIncrease = async (bookingId) => {
+  const applyPendingAllocationDecision = async (booking) => {
+    const choice = pendingAllocDecisions[booking.id];
+    if (!choice) {
+      setMessage('Choose Approve addition or Decline, then Apply.');
+      return;
+    }
     try {
-      await api.apiPatch(`/api/bookings/${bookingId}/approve-pending-allocation`, {});
-      setMessage(`Allocation increase applied for #${bookingId}.`);
+      if (choice === 'approve') {
+        await api.apiPatch(`/api/bookings/${booking.id}/approve-pending-allocation`, {});
+        setMessage(`Allocation increase applied for #${booking.id}.`);
+      } else {
+        if (!window.confirm(`Decline the additional space request for booking #${booking.id}? The exporter keeps their current confirmed allocation.`)) return;
+        await api.apiPatch(`/api/bookings/${booking.id}/reject-pending-allocation`, {});
+        setMessage(`Additional space request declined for #${booking.id}.`);
+      }
+      setPendingAllocDecisions((prev) => ({ ...prev, [booking.id]: '' }));
       await loadBookingsForAirline(activeAirline);
     } catch (error) {
-      setMessage(error.message || 'Could not approve increase');
+      setMessage(error.message || 'Allocation action failed');
     }
+  };
+
+  const toggleGeneralExporter = (id) => {
+    const sid = String(id);
+    setGeneralNotificationForm((prev) => {
+      const next = new Set(prev.selectedExporterIds.map(String));
+      if (next.has(sid)) next.delete(sid);
+      else next.add(sid);
+      return { ...prev, selectAllExporters: false, selectedExporterIds: Array.from(next) };
+    });
+  };
+
+  const toggleSelectAllGeneralExporters = () => {
+    setGeneralNotificationForm((prev) => {
+      const nextAll = !prev.selectAllExporters;
+      return {
+        ...prev,
+        selectAllExporters: nextAll,
+        selectedExporterIds: nextAll ? exporters.map((e) => String(e.id)) : []
+      };
+    });
   };
 
   const handleGeneralNotificationSubmit = async (event) => {
     event.preventDefault();
     try {
-      if (!generalNotificationForm.exporter_id || !generalNotificationForm.title || !generalNotificationForm.message) {
-        setMessage('Choose exporter, title, and message.');
+      if (!generalNotificationForm.title || !generalNotificationForm.message) {
+        setMessage('Title and message are required.');
         return;
       }
+      const allFlag = generalNotificationForm.selectAllExporters;
+      const ids = allFlag
+        ? exporters.map((e) => Number(e.id)).filter((n) => Number.isFinite(n) && n > 0)
+        : generalNotificationForm.selectedExporterIds.map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0);
+
+      if (!allFlag && ids.length < 2) {
+        setMessage('Select at least two exporters, or tick Select all.');
+        return;
+      }
+
       const payload = await api.apiPost('/api/notifications/direct', {
-        exporter_id: Number(generalNotificationForm.exporter_id),
+        all_exporters: allFlag,
+        exporter_ids: allFlag ? undefined : ids,
         title: generalNotificationForm.title,
         message: generalNotificationForm.message,
         type: 'info',
         send_email: generalNotificationForm.send_email,
         send_whatsapp: generalNotificationForm.send_whatsapp
       });
-      setMessage(`Notification sent. Dashboard: ${payload.dashboard_recipients || 0}, email: ${payload.email_recipients || 0}, WhatsApp: ${payload.whatsapp_sent ? 'sent' : 'not sent'}.`);
-      setGeneralNotificationForm({ exporter_id: '', title: '', message: '', send_email: true, send_whatsapp: true });
+      setMessage(
+        `Notification sent to ${payload.exporters_notified || 0} exporter account(s). Dashboard users: ${payload.dashboard_recipients || 0}, emails: ${payload.email_recipients || 0}, WhatsApp (companies): ${payload.whatsapp_exporters_reached || 0}.`
+      );
+      setGeneralNotificationForm({
+        selectedExporterIds: [],
+        selectAllExporters: false,
+        title: '',
+        message: '',
+        send_email: true,
+        send_whatsapp: true
+      });
     } catch (error) {
       setMessage(error.message || 'Failed to send notification');
     }
@@ -764,7 +798,9 @@ export default function AirlineDashboard() {
                           </tr>
                         </thead>
                         <tbody>
-                          {paged.map((booking) => (
+                          {paged.map((booking) => {
+                            const pendingInc = parsePendingIncreaseRequest(booking.pending_reason);
+                            return (
                             <tr key={booking.id} data-booking-id={booking.id}>
                               <td>#{booking.id}</td>
                               <td>{String(booking.flight_date).slice(0, 10)}</td>
@@ -773,7 +809,16 @@ export default function AirlineDashboard() {
                               <td>{Number(booking.tonnage_kg || 0).toFixed(2)}</td>
                               <td>{booking.bsa_type ? <span className="status-pill pending">{booking.bsa_type}</span> : '-'}</td>
                               <td>{booking.commodity || '-'}</td>
-                              <td><span className={`status-pill ${booking.status}`}>{String(booking.status || 'pending').toUpperCase()}</span></td>
+                              <td>
+                                <span className={`status-pill ${booking.status}`}>{String(booking.status || 'pending').toUpperCase()}</span>
+                                {pendingInc ? (
+                                  <p className="muted-cell" style={{ margin: '0.35rem 0 0', fontSize: '0.78rem', maxWidth: 220 }}>
+                                    <strong>Approval request:</strong>{' '}
+                                    exporter asks <strong>{pendingInc.skids}</strong> skids,{' '}
+                                    <strong>{Number(pendingInc.tonnage_kg).toLocaleString('en-US')}</strong> kg (addition).
+                                  </p>
+                                ) : null}
+                              </td>
                               <td>
                                 <div className="inline-actions" style={{ flexWrap: 'wrap', gap: '0.35rem' }}>
                                   {booking.status === 'pending' ? (
@@ -789,10 +834,20 @@ export default function AirlineDashboard() {
                                       <button type="button" className="table-action success" onClick={() => applyRowDecision(booking)}>Apply</button>
                                     </>
                                   ) : null}
-                                  {String(booking.pending_reason || '').includes('PENDING_INC') ? (
-                                    <button type="button" className="table-action" onClick={() => approvePendingIncrease(booking.id)}>
-                                      Approve increase
-                                    </button>
+                                  {pendingInc ? (
+                                    <>
+                                      <select
+                                        value={pendingAllocDecisions[booking.id] || ''}
+                                        onChange={(e) => setPendingAllocDecisions((prev) => ({ ...prev, [booking.id]: e.target.value }))}
+                                      >
+                                        <option value="">— Addition —</option>
+                                        <option value="approve">Approve addition</option>
+                                        <option value="reject">Decline addition</option>
+                                      </select>
+                                      <button type="button" className="table-action success" onClick={() => applyPendingAllocationDecision(booking)}>
+                                        Apply
+                                      </button>
+                                    </>
                                   ) : null}
                                   {['pending', 'approved'].includes(booking.status) ? (
                                     <button
@@ -820,7 +875,8 @@ export default function AirlineDashboard() {
                                 </div>
                               </td>
                             </tr>
-                          ))}
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
@@ -851,19 +907,39 @@ export default function AirlineDashboard() {
         <article className="panel-card analyst-uplift-card">
           <h3>General Notification</h3>
           <form className="booking-form compact-form" onSubmit={handleGeneralNotificationSubmit}>
-            <label>
-              Send to
-              <select
-                value={generalNotificationForm.exporter_id}
-                onChange={(event) => setGeneralNotificationForm({ ...generalNotificationForm, exporter_id: event.target.value })}
-                required
-              >
-                <option value="">Choose exporter</option>
-                {exporters.map((exporter) => (
-                  <option key={exporter.id} value={exporter.id}>{exporter.name}</option>
-                ))}
-              </select>
-            </label>
+            <fieldset className="full-width" style={{ border: '1px solid rgba(0,82,204,0.15)', borderRadius: 12, padding: '0.75rem 1rem', margin: 0 }}>
+              <legend style={{ fontWeight: 700, padding: '0 0.35rem' }}>Recipients</legend>
+              <label className="checkbox-row" style={{ marginBottom: '0.6rem' }}>
+                <input
+                  type="checkbox"
+                  checked={generalNotificationForm.selectAllExporters}
+                  onChange={toggleSelectAllGeneralExporters}
+                />
+                <span>Select all exporters</span>
+              </label>
+              <p className="muted-cell" style={{ margin: '0 0 0.5rem' }}>
+                Or choose <strong>two or more</strong> exporter accounts (checkboxes).
+              </p>
+              <div style={{ maxHeight: 200, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                {exporters.map((exporter) => {
+                  const sid = String(exporter.id);
+                  const checked =
+                    generalNotificationForm.selectAllExporters ||
+                    generalNotificationForm.selectedExporterIds.map(String).includes(sid);
+                  return (
+                    <label key={exporter.id} className="checkbox-row" style={{ fontWeight: 500 }}>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        disabled={generalNotificationForm.selectAllExporters}
+                        onChange={() => toggleGeneralExporter(exporter.id)}
+                      />
+                      <span>{exporter.name}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </fieldset>
             <label>
               Title
               <input
@@ -903,7 +979,6 @@ export default function AirlineDashboard() {
             </label>
             <div className="modal-button-group full-width">
               <button className="search-submit" type="submit">Send notification</button>
-              <button className="table-action" type="button" onClick={() => setShowUpliftModal(true)}>Operational uplift form</button>
             </div>
           </form>
         </article>
@@ -958,6 +1033,22 @@ export default function AirlineDashboard() {
                   </select>
                 </label>
                 <span className="status-pill live">{selectedExporterFilter || 'All exporters'}</span>
+                <select
+                  aria-label="Download performance data"
+                  className="table-action ghost"
+                  style={{ maxWidth: 220 }}
+                  defaultValue=""
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    e.target.value = '';
+                    if (v === 'products') downloadProductPerformanceCsv();
+                    if (v === 'weekly') downloadWeeklyExporterSummaryCsv();
+                  }}
+                >
+                  <option value="">Download…</option>
+                  <option value="products">Product chart (CSV)</option>
+                  <option value="weekly">Weekly by exporter (CSV)</option>
+                </select>
               </div>
             </div>
           </article>
@@ -1079,6 +1170,11 @@ export default function AirlineDashboard() {
           <article className="panel-card full-width seven-day-panel">
             <div className="admin-toolbar">
               <h3>7-Day Approved Bookings — Daily Performance</h3>
+              <div className="admin-toolbar-actions">
+                <button type="button" className="table-action" onClick={downloadSevenDayPerformanceCsv}>
+                  Download 7-day report (CSV)
+                </button>
+              </div>
             </div>
             <div className="seven-day-scroll">
               <div className="seven-day-grid">
@@ -1177,96 +1273,6 @@ export default function AirlineDashboard() {
               <div className="modal-button-group full-width">
                 <button type="submit" className="search-submit">Save</button>
                 <button type="button" className="table-action" onClick={() => setShowEditCapacityModal(false)}>Close</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      ) : null}
-
-      {showUpliftModal ? (
-        <div className="admin-modal-overlay" role="dialog" aria-label="Uplift form">
-          <div className="admin-modal compact-modal compact-modal-wide">
-            <h3>Operational Uplift Update</h3>
-            <form onSubmit={handleUpliftSubmit} className="booking-form compact-form">
-              <label>
-                Booking ID
-                <select
-                  value={upliftForm.bookingId}
-                  onChange={(e) => setUpliftForm({ ...upliftForm, bookingId: e.target.value })}
-                  required
-                >
-                  <option value="">Select booking</option>
-                  {upliftBookingOptions.map((booking) => (
-                    <option key={booking.id} value={String(booking.id)}>
-                      #{booking.id} - {booking.exporter} - {booking.destination} - {String(booking.flight_date || '').slice(0, 10)}
-                    </option>
-                  ))}
-                </select>
-                {!upliftBookingOptions.length ? (
-                  <span className="file-input-hint">No approved/pending bookings found for this filter.</span>
-                ) : null}
-              </label>
-              <div className="reschedule-summary full-width">
-                <div className="reschedule-summary-row">
-                  <span>Exporter</span>
-                  <strong>{selectedUpliftBooking?.exporter || 'Pick a booking ID to see exporter and destination.'}</strong>
-                </div>
-                <div className="reschedule-summary-row">
-                  <span>Destination</span>
-                  <strong>{selectedUpliftBooking?.destination || '—'}</strong>
-                </div>
-                <div className="reschedule-summary-row">
-                  <span>Flight date</span>
-                  <strong>{selectedUpliftBooking ? String(selectedUpliftBooking.flight_date || '').slice(0, 10) : '—'}</strong>
-                </div>
-              </div>
-              <label>
-                Actual KG
-                <input type="number" step="0.01" value={upliftForm.actual_kg} onChange={(e) => setUpliftForm({ ...upliftForm, actual_kg: e.target.value })} required />
-              </label>
-              <label>
-                AWB Number
-                <input type="text" value={upliftForm.awb_number} onChange={(e) => setUpliftForm({ ...upliftForm, awb_number: e.target.value })} required />
-              </label>
-              <label>
-                AWB Type
-                <select value={upliftForm.awb_type} onChange={(e) => setUpliftForm({ ...upliftForm, awb_type: e.target.value })}>
-                  <option value="house">House AWB</option>
-                  <option value="master">Master AWB</option>
-                  <option value="consolidation">Consolidation</option>
-                </select>
-              </label>
-              <label>
-                Update type
-                <select value={upliftForm.uplift_type} onChange={(e) => setUpliftForm({ ...upliftForm, uplift_type: e.target.value })}>
-                  <option value="full">Full loaded</option>
-                  <option value="half">Partial offload</option>
-                  <option value="offload">Offload</option>
-                </select>
-              </label>
-              <label>
-                KG Confirmation
-                <input type="number" step="0.01" value={upliftForm.kg_confirmation} onChange={(e) => setUpliftForm({ ...upliftForm, kg_confirmation: e.target.value })} />
-              </label>
-              <label>
-                Reason
-                <input type="text" value={upliftForm.reason} onChange={(e) => setUpliftForm({ ...upliftForm, reason: e.target.value })} />
-              </label>
-              <label>
-                Attachment
-                <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => setUpliftForm({ ...upliftForm, document: e.target.files?.[0] || null })} />
-              </label>
-              <label className="full-width">
-                Operational Message
-                <textarea value={upliftForm.message} onChange={(e) => setUpliftForm({ ...upliftForm, message: e.target.value })} />
-              </label>
-              <label className="full-width">
-                Explanation for Half/Offload
-                <textarea value={upliftForm.explanation} onChange={(e) => setUpliftForm({ ...upliftForm, explanation: e.target.value })} />
-              </label>
-              <div className="modal-button-group full-width">
-                <button type="submit" className="search-submit">Submit Uplift</button>
-                <button type="button" className="table-action" onClick={() => setShowUpliftModal(false)}>Close</button>
               </div>
             </form>
           </div>

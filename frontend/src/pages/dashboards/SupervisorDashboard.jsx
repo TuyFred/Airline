@@ -240,15 +240,15 @@ export default function SupervisorDashboard() {
 
   return (
     <DashboardShell
-      role="Airline Supervisor"
-      title="Final Control Desk"
+      role="Acceptance Team"
+      title="Acceptance Team — final control"
       subtitle=""
       accent="dashboard-airline"
       sidebarSummary=""
     >
       <div className="sheet-tabs" role="tablist" aria-label="Supervisor dashboard tabs">
-        <button className={activeTab === 'decisions' ? 'active' : ''} onClick={() => setTab('decisions')}>Final Decisions</button>
-        <button className={activeTab === 'uplift' ? 'active' : ''} onClick={() => setTab('uplift')}>Uplift Updates</button>
+        <button className={activeTab === 'decisions' ? 'active' : ''} onClick={() => setTab('decisions')}>Acceptance queue</button>
+        <button className={activeTab === 'uplift' ? 'active' : ''} onClick={() => setTab('uplift')}>Uplift confirmation</button>
       </div>
 
       <div className="inline-actions" style={{ marginBottom: '0.9rem', gap: '0.6rem', alignItems: 'center', flexWrap: 'wrap' }}>

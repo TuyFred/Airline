@@ -13,7 +13,7 @@ const NAV_LINKS = [
 const ROLES = [
   { name: 'Exporter',           id: 'exporter' },
   { name: 'Airline Analyst',    id: 'airline-analyst' },
-  { name: 'Airline Supervisor', id: 'airline-supervisor' },
+  { name: 'Acceptance Team', id: 'airline-supervisor' },
   { name: 'Clearing Agent',     id: 'clearing-agent' },
   { name: 'Admin',              id: 'admin' },
 ];

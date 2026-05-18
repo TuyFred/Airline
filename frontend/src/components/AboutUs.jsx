@@ -216,19 +216,19 @@ export default function AboutUs() {
           <div className="story-content-card">
             <div className="story-content-topline">Our story</div>
             <p className="story-intro">
-              <strong>SBU Air Cargo</strong> was founded by Justin, a supply chain engineer with hands on experience leading export operations at Souk Farms Ltd, where he built strong relationships with airline cargo teams (RwandAir, ADL/Ethiopian, KLM) and optimized daily shipments to cut conflicts, boost space utilization, and lower spoilage.
+              <strong>SBU Air Cargo</strong> was founded by Justin, a supply chain engineer with hands-on experience leading export operations at Souk Farms Ltd, where he built strong relationships with airline cargo teams (RwandAir, ADL/Ethiopian, KLM) and optimized daily shipments to reduce conflicts, improve space utilization, and lower spoilage.
             </p>
 
             <p className="story-block story-problem">
-              <strong>The Problem:</strong> Seeing the same pain points across Rwanda's horticulture exporters: Chronic capacity crunch despite available capacity, no-shows wasting allocations, and last-minute disruptions. Justin recognized an opportunity to create lasting change.
+              <strong>The Problem:</strong> The same pain points kept appearing across Rwanda's horticulture exporters: chronic capacity crunch despite available capacity, no-shows wasting allocations, and last-minute disruptions. Justin recognized an opportunity to create lasting change.
             </p>
 
             <p className="story-block story-solution">
-              <strong>The Solution:</strong> Launched SBU Air Cargo Digital Hub in 2026 as a neutral, technology driven platform. We are not a freight forwarder or carrier. Instead, we act as the trusted hub that centralizes requests, publishes airline space availability, enables instant reallocations, and manages coordination so exporters (from smallholders to large players) get fair, efficient access to air cargo.
+              <strong>The Solution:</strong> SBU Air Cargo Digital Hub was launched in 2026 as a neutral, technology-driven platform. We are not a freight forwarder or a carrier. Instead, we act as the trusted hub that centralizes requests, publishes airline space availability, enables instant reallocations, and manages coordination so exporters (from smallholders to large players) get fair and efficient access to air cargo.
             </p>
 
             <p className="story-closing story-result">
-              <strong>The Result:</strong> Backed by proven industry relationships and a commitment to transparency, SBU Air Cargo turns Rwanda's existing capacity into a competitive advantage, delivering more produce to global markets, fresher and faster. Exporters have full time focus to streamline the production and packhouse operations while SBU handles air cargo matters.
+              <strong>The Result:</strong> Backed by proven industry relationships and a commitment to transparency, SBU Air Cargo turns Rwanda's existing capacity into a competitive advantage, delivering more produce to global markets, fresher and faster. Exporters can keep a full-time focus on streamlining production and packhouse operations while SBU handles air cargo matters.
             </p>
 
             <div className="story-partners">
@@ -239,7 +239,7 @@ export default function AboutUs() {
                 <div className="airline-badge">KLM</div>
               </div>
               <p className="partners-note">
-                As market grow and get stable SBU intend to approach additional air cargo carriers to increase Rwanda's fresh export capacity.
+                As the market grows and stabilizes, SBU intends to approach additional air cargo carriers to increase Rwanda's fresh export capacity.
               </p>
             </div>
           </div>

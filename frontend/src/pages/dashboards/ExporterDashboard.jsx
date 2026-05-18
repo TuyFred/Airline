@@ -3,7 +3,25 @@ import DashboardShell from '../../components/DashboardShell';
 import Pagination, { usePagination } from '../../components/Pagination';
 import api from '../../services/api';
 import '../../styles/DashboardPages.css';
-import { AIRLINE_ROUTE_GUIDES } from '../../utils/pmcPlanning';
+function csvEscape(v) {
+  const s = String(v ?? '');
+  if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+function downloadCsv(filename, headerRow, dataRows) {
+  const lines = [headerRow.map(csvEscape).join(',')];
+  for (const row of dataRows) {
+    lines.push(row.map(csvEscape).join(','));
+  }
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 const COMMODITY_OPTIONS = ['Vegetables', 'Flowers', 'Chilli', 'Fruits', 'Others'];
 
@@ -46,19 +64,15 @@ function canCancelBefore24h(flightDate) {
   return Number.isFinite(hoursUntilDeparture) && hoursUntilDeparture >= 24;
 }
 
-function canEditBeforeFlightDate(flightDate, todayIso) {
-  const flightDay = normalizeDate(flightDate);
-  return Boolean(flightDay) && flightDay >= todayIso;
+function canModifyApprovedBefore24h(flightDate) {
+  return canCancelBefore24h(flightDate);
 }
 
-function canEditPendingBooking(booking, todayIso) {
-  // For pending bookings, allow editing even if flight date has passed
-  // since they haven't been approved yet by the airline analyst
+function canEditPendingBooking(booking) {
   if (booking.status === 'pending') {
     return true;
   }
-  // For approved bookings, only allow editing before flight date
-  return canEditBeforeFlightDate(booking.flight_date, todayIso);
+  return canModifyApprovedBefore24h(booking.flight_date);
 }
 
 function canCancelPendingBooking(booking) {
@@ -110,6 +124,53 @@ export default function ExporterDashboard() {
       return normalizeDate(row?.flight_date) >= todayIso;
     });
   }, [availability, todayIso]);
+
+  const allowedPublicationDates = useMemo(() => {
+    const set = new Set();
+    for (const row of activeAvailability) {
+      const d = normalizeDate(row?.flight_date);
+      if (d) set.add(d);
+    }
+    return Array.from(set).sort();
+  }, [activeAvailability]);
+
+  const flightDateSelectOptions = useMemo(() => {
+    const base = [...allowedPublicationDates];
+    if (editingBookingId) {
+      const b = bookings.find((x) => String(x.id) === String(editingBookingId));
+      const d = b ? normalizeDate(b.flight_date) : '';
+      if (d && !base.includes(d)) base.push(d);
+      base.sort();
+    }
+    return base;
+  }, [allowedPublicationDates, editingBookingId, bookings]);
+
+  const mySevenDayPerformance = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const days = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
+      return d.toISOString().slice(0, 10);
+    });
+    return days.map((day) => {
+      const dayBookings = bookings.filter(
+        (b) =>
+          normalizeDate(b.flight_date) === day &&
+          String(b.status || '').toLowerCase() === 'approved'
+      );
+      const plannedKg = dayBookings.reduce((s, b) => s + toNumber(b.tonnage_kg), 0);
+      const usedKg = dayBookings.reduce((s, b) => s + toNumber(b.kg_confirmation || b.actual_kg), 0);
+      return {
+        day,
+        label: new Date(`${day}T00:00:00`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
+        rows: dayBookings,
+        plannedKg,
+        usedKg,
+        performance: plannedKg > 0 ? Math.round((usedKg / plannedKg) * 100) : 0
+      };
+    });
+  }, [bookings]);
 
   const airlineOptions = useMemo(() => {
     const unique = new Map();
@@ -174,10 +235,6 @@ export default function ExporterDashboard() {
     const found = airlineOptions.find((item) => Number(item.id) === Number(form.airline_id));
     return found?.name || effectiveCapacity?.airline || '';
   }, [airlineOptions, form.airline_id, effectiveCapacity]);
-
-  const selectedRouteGuide = useMemo(() => {
-    return AIRLINE_ROUTE_GUIDES[normalizeText(selectedAirlineName)] || null;
-  }, [selectedAirlineName]);
 
   const exceedsCapacityMidWeek = useMemo(() => {
     if (!effectiveCapacity) return false;
@@ -267,6 +324,64 @@ export default function ExporterDashboard() {
     if (activeView !== 'performance') return;
     loadPerformance();
   }, [activeView, perfFilters.start_date, perfFilters.end_date]);
+
+  const downloadMyPerformanceSummaryCsv = () => {
+    const rows = (performance.summary || []).map((row) => [
+      row.exporter_name,
+      row.bookings,
+      row.asked_kg,
+      row.approved_kg,
+      row.used_kg,
+      row.performance_pct
+    ]);
+    downloadCsv(
+      `my-performance-summary-${new Date().toISOString().slice(0, 10)}.csv`,
+      ['Scope', 'Bookings', 'Asked_kg', 'Approved_kg', 'Used_kg', 'Performance_pct'],
+      rows
+    );
+  };
+
+  const downloadMyPerformanceWeeklyCsv = () => {
+    const rows = (performance.weekly || []).map((row) => [
+      row.week,
+      row.exporter_name,
+      row.asked_kg,
+      row.approved_kg,
+      row.used_kg,
+      row.performance_pct
+    ]);
+    downloadCsv(
+      `my-performance-weekly-${new Date().toISOString().slice(0, 10)}.csv`,
+      ['Week', 'Exporter', 'Asked_kg', 'Approved_kg', 'Used_kg', 'Performance_pct'],
+      rows
+    );
+  };
+
+  const downloadMySevenDayCsv = () => {
+    const header = ['Day', 'Label', 'Planned_kg', 'Used_kg', 'Performance_pct', 'Booking_id', 'Airline', 'Destination', 'Skids', 'Tonnage_kg'];
+    const dataRows = [];
+    for (const day of mySevenDayPerformance) {
+      if (!day.rows.length) {
+        dataRows.push([day.day, day.label, day.plannedKg, day.usedKg, day.performance, '', '', '', '', '']);
+      } else {
+        for (const b of day.rows) {
+          dataRows.push([
+            day.day,
+            day.label,
+            day.plannedKg,
+            day.usedKg,
+            day.performance,
+            b.id,
+            b.airline || '',
+            b.destination || '',
+            b.skids,
+            b.tonnage_kg
+          ]);
+        }
+      }
+    }
+    downloadCsv(`my-seven-day-performance-${new Date().toISOString().slice(0, 10)}.csv`, header, dataRows);
+  };
 
   const loadAll = async () => {
     try {
@@ -1119,11 +1234,6 @@ export default function ExporterDashboard() {
                   <div className="capacity-row-info">
                     <strong>✈️ {row.airline} • {row.destination}</strong>
                     <p>📅 {row.flight_date} | Managed by Airline Analyst</p>
-                    {AIRLINE_ROUTE_GUIDES[normalizeText(row.airline)] ? (
-                      <p>
-                        Route: {AIRLINE_ROUTE_GUIDES[normalizeText(row.airline)].from} to {AIRLINE_ROUTE_GUIDES[normalizeText(row.airline)].to}
-                      </p>
-                    ) : null}
                   </div>
                   <div className="capacity-values">
                     <div className="capacity-detail">
@@ -1245,7 +1355,7 @@ export default function ExporterDashboard() {
                             type="button"
                             className="table-action"
                             onClick={() => openAllocationEditor(row)}
-                            disabled={!canEditBeforeFlightDate(row.flight_date, todayIso)}
+                            disabled={!canModifyApprovedBefore24h(row.flight_date)}
                           >
                             Edit space
                           </button>
@@ -1658,6 +1768,24 @@ export default function ExporterDashboard() {
               className="table-action ghost"
               onClick={() => setPerfFilters({ start_date: '', end_date: '' })}
             >Reset</button>
+            <select
+              aria-label="Download performance report"
+              className="table-action ghost"
+              style={{ maxWidth: 220 }}
+              defaultValue=""
+              onChange={(e) => {
+                const v = e.target.value;
+                e.target.value = '';
+                if (v === 'summary') downloadMyPerformanceSummaryCsv();
+                if (v === 'weekly') downloadMyPerformanceWeeklyCsv();
+                if (v === 'seven') downloadMySevenDayCsv();
+              }}
+            >
+              <option value="">Download report…</option>
+              <option value="summary">Summary totals (CSV)</option>
+              <option value="weekly">Weekly breakdown (CSV)</option>
+              <option value="seven">7-day outlook (CSV)</option>
+            </select>
           </div>
 
           <div className="perf-graph">
@@ -1712,6 +1840,25 @@ export default function ExporterDashboard() {
               </div>
             </>
           ) : null}
+
+          <h4 style={{ marginTop: '1.5rem' }}>7-day outlook (your approved bookings)</h4>
+          <p className="muted-cell" style={{ marginBottom: '0.75rem' }}>
+            Same rolling view as airline analysts: each day shows planned vs uplift-used weight for flights on that calendar date.
+          </p>
+          <div className="seven-day-scroll" style={{ maxHeight: 320, overflow: 'auto' }}>
+            <div className="seven-day-grid">
+              {mySevenDayPerformance.map((day) => (
+                <div key={day.day} className={`seven-day-card${day.rows.length ? '' : ' empty'}`}>
+                  <strong className="seven-day-label">{day.label}</strong>
+                  <div className="seven-day-stats">
+                    <div><span>Planned</span><strong>{day.plannedKg.toLocaleString('en-US')} kg</strong></div>
+                    <div><span>Used</span><strong>{day.usedKg.toLocaleString('en-US')} kg</strong></div>
+                    <div><span>Perf.</span><strong>{day.performance}%</strong></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </article>
       ) : null}
 
@@ -1743,7 +1890,7 @@ export default function ExporterDashboard() {
               }}>
                 <strong style={{ color: '#1976d2', fontSize: '1.05rem' }}>✏️ Edit Booking #{editingBookingId}</strong>
                 <p style={{ margin: '0.4rem 0 0 0', fontSize: '0.95rem', color: '#333', fontWeight: '500' }}>
-                  You can modify flight date, skids, and weight
+                  You can modify flight date (published dates only), skids, and weight. Approved bookings: changes allowed only until 24 hours before the flight date.
                 </p>
               </div>
             )}
@@ -1779,21 +1926,24 @@ export default function ExporterDashboard() {
                   <label htmlFor="flight_date">
                     Flight date * {editingBookingId && <span style={{ color: '#00c853', fontWeight: '600' }}>(editable)</span>}
                   </label>
-                  <input
+                  <select
                     id="flight_date"
-                    type="date"
-                    min={todayIso}
                     value={form.flight_date}
                     onChange={(event) => {
                       setSelectedCapacityId('');
                       setForm({ ...form, flight_date: event.target.value, capacity_id: '' });
                     }}
                     required
-                    style={editingBookingId ? { 
+                    style={editingBookingId ? {
                       border: '2px solid #00c853',
                       backgroundColor: '#f0fff4'
                     } : {}}
-                  />
+                  >
+                    <option value="">{flightDateSelectOptions.length ? 'Select published flight date' : 'No published dates — check Space Availability'}</option>
+                    {flightDateSelectOptions.map((d) => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="form-group">
@@ -1927,15 +2077,6 @@ export default function ExporterDashboard() {
                     </div>
                   </div>
                 </div>
-
-                {selectedRouteGuide && !editingBookingId ? (
-                  <div className="form-group weight-group route-guide-card">
-                    <label>Route Guidance</label>
-                    <p>
-                      From: <strong>{selectedRouteGuide.from}</strong> | To: <strong>{selectedRouteGuide.to}</strong> | Typical cargo: {selectedRouteGuide.cargo}
-                    </p>
-                  </div>
-                ) : null}
 
                 <div className="form-group">
                   <label htmlFor="commodity">Commodity * {editingBookingId && '(not editable)'}</label>

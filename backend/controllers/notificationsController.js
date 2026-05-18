@@ -95,56 +95,90 @@ async function sendDirectNotification(req, res, next) {
       return res.status(403).json({ message: "Not authorized to send notifications" });
     }
 
-    const { exporter_id, title, message, type = 'info', send_email = true, send_whatsapp = true } = req.body;
-    if (!exporter_id || !title || !message) {
-      return res.status(400).json({ message: "Exporter, title, and message are required" });
+    const {
+      exporter_ids,
+      all_exporters,
+      title,
+      message,
+      type = 'info',
+      send_email = true,
+      send_whatsapp = true
+    } = req.body;
+
+    if (!title || !message) {
+      return res.status(400).json({ message: "Title and message are required" });
     }
 
-    const exporterRows = await query(
-      `SELECT id, name, contact_email, whatsapp_contact FROM exporters WHERE id = ? LIMIT 1`,
-      [exporter_id]
-    );
-    if (!exporterRows.length) return res.status(404).json({ message: "Exporter not found" });
-    const exporter = exporterRows[0];
+    const allFlag = all_exporters === true || all_exporters === 'true' || all_exporters === 1;
+    let targetIds = [];
 
-    const users = await query(
-      `SELECT id, full_name, email FROM users WHERE linked_exporter_id = ? AND role = 'exporter' AND is_active = 1`,
-      [exporter_id]
-    );
-
-    for (const user of users) {
-      await pushNotification(user.id, title, message, type);
+    if (allFlag) {
+      const rows = await query(`SELECT id FROM exporters ORDER BY name ASC`);
+      targetIds = rows.map((r) => Number(r.id)).filter((n) => Number.isFinite(n) && n > 0);
+    } else if (Array.isArray(exporter_ids) && exporter_ids.length) {
+      targetIds = [...new Set(exporter_ids.map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0))];
     }
 
-    let emailCount = 0;
-    if (send_email && process.env.BREVO_API_KEY) {
-      const recipients = users
-        .filter((user) => user.email)
-        .map((user) => ({ email: user.email, name: user.full_name || exporter.name }));
-      if (!recipients.length && exporter.contact_email) {
-        recipients.push({ email: exporter.contact_email, name: exporter.name });
+    if (!targetIds.length) {
+      return res.status(400).json({ message: "Choose exporters to notify, or select all" });
+    }
+
+    if (!allFlag && targetIds.length < 2) {
+      return res.status(400).json({ message: "Select at least two exporters, or use Select all" });
+    }
+
+    let dashboardRecipients = 0;
+    let emailRecipients = 0;
+    let whatsappSentCount = 0;
+
+    for (const eid of targetIds) {
+      const exporterRows = await query(
+        `SELECT id, name, contact_email, whatsapp_contact FROM exporters WHERE id = ? LIMIT 1`,
+        [eid]
+      );
+      if (!exporterRows.length) continue;
+      const exporter = exporterRows[0];
+
+      const users = await query(
+        `SELECT id, full_name, email FROM users WHERE linked_exporter_id = ? AND role = 'exporter' AND is_active = 1`,
+        [eid]
+      );
+
+      for (const user of users) {
+        await pushNotification(user.id, title, message, type);
       }
-      if (recipients.length) {
-        await sendBrevoEmail({
-          sender: getBrevoSender(),
-          to: recipients,
-          subject: title,
-          textContent: `${message}\n\nSent by ${req.user.full_name || 'SBU Airline Analyst'}`
-        });
-        emailCount = recipients.length;
+      dashboardRecipients += users.length;
+
+      if (send_email && process.env.BREVO_API_KEY) {
+        let recipients = users
+          .filter((user) => user.email)
+          .map((user) => ({ email: user.email, name: user.full_name || exporter.name }));
+        if (!recipients.length && exporter.contact_email) {
+          recipients = [{ email: exporter.contact_email, name: exporter.name }];
+        }
+        if (recipients.length) {
+          await sendBrevoEmail({
+            sender: getBrevoSender(),
+            to: recipients,
+            subject: title,
+            textContent: `${message}\n\nSent by ${req.user.full_name || 'SBU Airline Analyst'}`
+          });
+          emailRecipients += recipients.length;
+        }
+      }
+
+      if (send_whatsapp) {
+        const whatsapp = await sendWhatsAppNotice(exporter.whatsapp_contact, `${title}\n\n${message}`);
+        if (whatsapp.sent) whatsappSentCount += 1;
       }
     }
-
-    const whatsapp = send_whatsapp
-      ? await sendWhatsAppNotice(exporter.whatsapp_contact, `${title}\n\n${message}`)
-      : { sent: false, reason: "disabled" };
 
     return res.json({
       message: "Notification sent",
-      dashboard_recipients: users.length,
-      email_recipients: emailCount,
-      whatsapp_sent: Boolean(whatsapp.sent),
-      whatsapp_status: whatsapp.reason || "sent"
+      exporters_notified: targetIds.length,
+      dashboard_recipients: dashboardRecipients,
+      email_recipients: emailRecipients,
+      whatsapp_exporters_reached: whatsappSentCount
     });
   } catch (error) {
     return next(error);

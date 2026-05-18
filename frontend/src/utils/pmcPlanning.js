@@ -2,33 +2,13 @@ export const PMC_STANDARD_KG = 5000;
 export const PMC_STANDARD_SKIDS = 4;
 
 export const AIRLINE_DIRECTION_OPTIONS = {
-  RWANDAIR: ['AMSTERDAM', 'LONDON', 'DOHA'],
   ETHIOPIAN: ['FRANKFURT', 'DUBAI', 'GUANGZHOU'],
   'ETHIOPIAN AIRLINES': ['FRANKFURT', 'DUBAI', 'GUANGZHOU'],
   KLM: ['AMSTERDAM', 'PARIS'],
   QATAR: ['DOHA', 'JEDDAH'],
-  'KENYA AIRWAYS': ['BRUSSELS', 'AMSTERDAM', 'LONDON'],
   BRUSSELS: ['BRUSSELS', 'LIEGE'],
   TURKISH: ['ISTANBUL', 'FRANKFURT'],
   EGYPTAIR: ['CAIRO', 'JEDDAH']
-};
-
-export const AIRLINE_ROUTE_GUIDES = {
-  RWANDAIR: {
-    from: 'Kigali',
-    to: 'Amsterdam',
-    cargo: 'Fresh flowers, vegetables'
-  },
-  'KENYA AIRWAYS': {
-    from: 'Nairobi',
-    to: 'Brussels',
-    cargo: 'Fruits, fish'
-  },
-  'ETHIOPIAN AIRLINES': {
-    from: 'Addis Ababa',
-    to: 'Frankfurt',
-    cargo: 'Coffee, flowers'
-  }
 };
 
 export function normalizeAirlineKey(name) {

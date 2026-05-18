@@ -10,6 +10,8 @@ async function listExporterPricing(req, res, next) {
     const rows = await query(
       `SELECT e.id AS exporter_id, e.name AS exporter_name,
               COALESCE(p.price_per_kg, 5) AS price_per_kg,
+              COALESCE(p.pricing_model, 'per_kg') AS pricing_model,
+              p.price_per_awb,
               COALESCE(p.currency, 'USD') AS currency,
               p.notes,
               p.updated_at
@@ -25,21 +27,45 @@ async function listExporterPricing(req, res, next) {
 
 async function upsertExporterPricing(req, res, next) {
   try {
-    const { exporter_id, price_per_kg, currency, notes } = req.body;
+    const { exporter_id, price_per_kg, price_per_awb, pricing_model, currency, notes } = req.body;
     if (!exporter_id) return res.status(400).json({ message: "exporter_id is required" });
     const price = Number(price_per_kg);
     if (!Number.isFinite(price) || price < 0) {
-      return res.status(400).json({ message: "price_per_kg must be a positive number" });
+      return res.status(400).json({ message: "price_per_kg must be a non-negative number" });
+    }
+
+    const modelRaw = String(pricing_model || "per_kg").toLowerCase();
+    const model = modelRaw === "per_awb" ? "per_awb" : "per_kg";
+    let awbPrice = null;
+    if (model === "per_awb") {
+      const pAwb = Number(price_per_awb);
+      if (!Number.isFinite(pAwb) || pAwb < 0) {
+        return res.status(400).json({ message: "price_per_awb is required and must be non-negative when pricing_model is per_awb" });
+      }
+      awbPrice = pAwb;
+    } else if (price_per_awb != null && price_per_awb !== "") {
+      const pAwb = Number(price_per_awb);
+      if (Number.isFinite(pAwb) && pAwb >= 0) awbPrice = pAwb;
     }
 
     const exporter = await query(`SELECT id FROM exporters WHERE id = ? LIMIT 1`, [exporter_id]);
     if (!exporter.length) return res.status(404).json({ message: "Exporter not found" });
 
+    if (model === "per_kg" && awbPrice == null) {
+      const existing = await query(`SELECT price_per_awb FROM exporter_pricing WHERE exporter_id = ? LIMIT 1`, [exporter_id]);
+      if (existing.length && existing[0].price_per_awb != null && existing[0].price_per_awb !== "") {
+        const legacy = Number(existing[0].price_per_awb);
+        if (Number.isFinite(legacy) && legacy >= 0) awbPrice = legacy;
+      }
+    }
+
     await query(
-      `INSERT INTO exporter_pricing (exporter_id, price_per_kg, currency, notes, updated_by)
-       VALUES (?, ?, ?, ?, ?)
+      `INSERT INTO exporter_pricing (exporter_id, price_per_kg, pricing_model, price_per_awb, currency, notes, updated_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE
          price_per_kg = VALUES(price_per_kg),
+         pricing_model = VALUES(pricing_model),
+         price_per_awb = VALUES(price_per_awb),
          currency = VALUES(currency),
          notes = VALUES(notes),
          updated_by = VALUES(updated_by),
@@ -47,26 +73,24 @@ async function upsertExporterPricing(req, res, next) {
       [
         Number(exporter_id),
         price,
+        model,
+        awbPrice,
         String(currency || "USD").toUpperCase().slice(0, 8),
         notes ? String(notes).slice(0, 250) : null,
         req.user?.id || null
       ]
     );
 
-    return res.json({ message: "Exporter price saved", exporter_id: Number(exporter_id), price_per_kg: price });
+    return res.json({
+      message: "Exporter price saved",
+      exporter_id: Number(exporter_id),
+      price_per_kg: price,
+      pricing_model: model,
+      price_per_awb: awbPrice
+    });
   } catch (error) {
     return next(error);
   }
-}
-
-async function getExporterPriceForBilling(exporterId) {
-  const rows = await query(
-    `SELECT price_per_kg FROM exporter_pricing WHERE exporter_id = ? LIMIT 1`,
-    [exporterId]
-  );
-  if (!rows.length) return 5.0;
-  const value = Number(rows[0].price_per_kg);
-  return Number.isFinite(value) && value > 0 ? value : 5.0;
 }
 
 async function downloadWeeklyInvoiceReport(req, res, next) {
@@ -99,8 +123,18 @@ async function downloadWeeklyInvoiceReport(req, res, next) {
          e.name AS exporter_name,
          a.name AS airline_name,
          un.awb_number,
-         COALESCE(uc.actual_kg, un.actual_kg, 0) AS uplifted_kg,
-         COALESCE(p.price_per_kg, 5) AS price_per_kg
+         COALESCE(
+           CASE
+             WHEN uc_sup.actual_kg IS NOT NULL AND uc_clr.actual_kg IS NOT NULL
+               THEN LEAST(uc_sup.actual_kg, uc_clr.actual_kg)
+             ELSE COALESCE(uc_sup.actual_kg, uc_clr.actual_kg)
+           END,
+           un.actual_kg,
+           0
+         ) AS uplifted_kg,
+         COALESCE(p.price_per_kg, 5) AS price_per_kg,
+         COALESCE(p.pricing_model, 'per_kg') AS pricing_model,
+         p.price_per_awb
        FROM bookings b
        JOIN exporters e ON b.exporter_id = e.id
        JOIN airlines a ON b.airline_id = a.id
@@ -109,11 +143,30 @@ async function downloadWeeklyInvoiceReport(req, res, next) {
          SELECT u.booking_id, MAX(u.id) AS max_id FROM uplift_notifications u GROUP BY u.booking_id
        ) latest ON latest.booking_id = b.id
        LEFT JOIN uplift_notifications un ON un.id = latest.max_id
-       LEFT JOIN uplift_confirmations uc ON uc.booking_id = b.id AND uc.confirmer_role = 'airline_supervisor'
+       LEFT JOIN uplift_confirmations uc_sup ON uc_sup.booking_id = b.id AND uc_sup.confirmer_role = 'airline_supervisor'
+       LEFT JOIN uplift_confirmations uc_clr ON uc_clr.booking_id = b.id AND uc_clr.confirmer_role = 'clearing_agent'
        WHERE 1 = 1 ${where}
        ORDER BY b.flight_date DESC, b.id DESC`,
       params
     );
+
+    const bookingIds = [...new Set(rows.map((r) => r.booking_id).filter(Boolean))];
+    const awbCountMap = new Map();
+    if (bookingIds.length) {
+      const placeholders = bookingIds.map(() => "?").join(",");
+      const awbRows = await query(
+        `SELECT booking_id, COUNT(DISTINCT TRIM(awb_number)) AS c
+         FROM uplift_notifications
+         WHERE booking_id IN (${placeholders})
+           AND awb_number IS NOT NULL
+           AND TRIM(awb_number) <> ''
+         GROUP BY booking_id`,
+        bookingIds
+      );
+      for (const ar of awbRows) {
+        awbCountMap.set(Number(ar.booking_id), Number(ar.c) || 0);
+      }
+    }
 
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet("Weekly Invoices");
@@ -125,7 +178,9 @@ async function downloadWeeklyInvoiceReport(req, res, next) {
       { header: "AWB Code", key: "awb", width: 22 },
       { header: "Destination", key: "destination", width: 18 },
       { header: "Uplifted KG", key: "uplifted_kg", width: 14 },
-      { header: "Price / KG (USD)", key: "price_per_kg", width: 16 },
+      { header: "Pricing model", key: "pricing_model", width: 14 },
+      { header: "Billable units", key: "billable_units", width: 14 },
+      { header: "Unit price", key: "unit_price", width: 14 },
       { header: "Total Amount (USD)", key: "total", width: 18 }
     ];
     sheet.getRow(1).font = { bold: true };
@@ -139,8 +194,15 @@ async function downloadWeeklyInvoiceReport(req, res, next) {
     let totalAmount = 0;
     for (const row of rows) {
       const kg = Number(row.uplifted_kg) || 0;
-      const price = Number(row.price_per_kg) || 0;
-      const amount = +(kg * price).toFixed(2);
+      const priceKg = Number(row.price_per_kg) || 0;
+      const model = String(row.pricing_model || "per_kg").toLowerCase() === "per_awb" ? "per_awb" : "per_kg";
+      const priceAwb = row.price_per_awb == null || row.price_per_awb === "" ? null : Number(row.price_per_awb);
+      const rawAwbs = awbCountMap.get(Number(row.booking_id)) || 0;
+      const awbBill = rawAwbs > 0 ? rawAwbs : 1;
+      const usePerAwb = model === "per_awb" && priceAwb != null && Number.isFinite(priceAwb);
+      const billableUnits = usePerAwb ? awbBill : kg;
+      const unitPrice = usePerAwb ? priceAwb : priceKg;
+      const amount = +(billableUnits * unitPrice).toFixed(2);
       totalKg += kg;
       totalAmount += amount;
       sheet.addRow({
@@ -151,7 +213,9 @@ async function downloadWeeklyInvoiceReport(req, res, next) {
         awb: row.awb_number || "",
         destination: row.destination || "",
         uplifted_kg: kg,
-        price_per_kg: price,
+        pricing_model: usePerAwb ? "per_awb" : "per_kg",
+        billable_units: billableUnits,
+        unit_price: unitPrice,
         total: amount
       });
     }
@@ -405,7 +469,7 @@ async function downloadInvoiceExcel(req, res, next) {
     });
 
     /* ===== Branded header band ===== */
-    sheet.mergeCells("A1:I3");
+    sheet.mergeCells("A1:H3");
     const titleCell = sheet.getCell("A1");
     titleCell.value = "SBU EXPORT COORDINATION HUB — INVOICE";
     titleCell.font = { bold: true, size: 18, color: { argb: "FFFFFFFF" } };
@@ -416,7 +480,7 @@ async function downloadInvoiceExcel(req, res, next) {
       fgColor: { argb: "FF0B51AA" }
     };
 
-    sheet.mergeCells("A4:I4");
+    sheet.mergeCells("A4:H4");
     const taglineCell = sheet.getCell("A4");
     taglineCell.value = "Air cargo coordination · Booking · Uplift · Settlement   |   https://sbuexport.com   |   finance@sbu.rw";
     taglineCell.font = { italic: true, size: 10, color: { argb: "FF155EAB" } };
@@ -444,13 +508,24 @@ async function downloadInvoiceExcel(req, res, next) {
       sheet.getCell(`G${r}`).value = pair[0];
       sheet.getCell(`G${r}`).font = { bold: true, size: 9, color: { argb: "FF607080" } };
       sheet.getCell(`G${r}`).alignment = { horizontal: "right" };
-      sheet.mergeCells(`H${r}:I${r}`);
+      sheet.mergeCells(`H${r}:H${r}`);
       sheet.getCell(`H${r}`).value = pair[1];
       sheet.getCell(`H${r}`).font = { size: 10, bold: true };
       sheet.getCell(`H${r}`).alignment = { horizontal: "left" };
     });
 
-    /* ===== Shipment table header — exact column order requested ===== */
+    const computeUpliftedKg = (row) => {
+      const billed = Number(row.quantity_kg);
+      if (Number.isFinite(billed) && billed > 0) return billed;
+      const sup = Number(row.airline_supervisor_kg || 0);
+      const clr = Number(row.clearing_agent_kg || 0);
+      if (sup > 0 && clr > 0) return Math.min(sup, clr);
+      if (sup > 0) return sup;
+      if (clr > 0) return clr;
+      return 0;
+    };
+
+    /* ===== Shipment table — Uplifted (kg) is always a number (never blank) ===== */
     const headerRowIdx = 13;
     sheet.getRow(headerRowIdx).values = [
       "Booking ID",
@@ -459,8 +534,7 @@ async function downloadInvoiceExcel(req, res, next) {
       "Date flight",
       "Destination",
       "AWB code",
-      "Airline supervisor kgs",
-      "Clearing Agent kgs",
+      "Uplifted (kg)",
       "Created"
     ];
     const headerRow = sheet.getRow(headerRowIdx);
@@ -484,17 +558,15 @@ async function downloadInvoiceExcel(req, res, next) {
       { key: "flight_date", width: 14 },
       { key: "destination", width: 16 },
       { key: "awb", width: 22 },
-      { key: "supervisor_kg", width: 18 },
-      { key: "agent_kg", width: 18 },
+      { key: "uplifted_kg", width: 18 },
       { key: "created", width: 20 }
     ];
 
     let dataRowIdx = headerRowIdx + 1;
-    let totalSup = 0;
-    let totalAgent = 0;
+    let totalUplifted = 0;
 
     if (lines.length === 0) {
-      sheet.mergeCells(`A${dataRowIdx}:I${dataRowIdx}`);
+      sheet.mergeCells(`A${dataRowIdx}:H${dataRowIdx}`);
       const c = sheet.getCell(`A${dataRowIdx}`);
       c.value = "No shipment data recorded for this invoice.";
       c.font = { italic: true, color: { argb: "FF607080" } };
@@ -502,10 +574,8 @@ async function downloadInvoiceExcel(req, res, next) {
       dataRowIdx += 1;
     } else {
       lines.forEach((row, idx) => {
-        const supKg = Number(row.airline_supervisor_kg || row.quantity_kg || 0);
-        const agentKg = Number(row.clearing_agent_kg || 0);
-        totalSup += supKg;
-        totalAgent += agentKg;
+        const upliftedKg = computeUpliftedKg(row);
+        totalUplifted += upliftedKg;
         const r = sheet.getRow(dataRowIdx);
         r.values = [
           row.booking_id ? `#${row.booking_id}` : "—",
@@ -514,14 +584,13 @@ async function downloadInvoiceExcel(req, res, next) {
           row.flight_date ? String(row.flight_date).slice(0, 10) : "—",
           row.destination || "—",
           row.awb_number || "—",
-          supKg,
-          agentKg,
+          upliftedKg,
           row.line_created_at
             ? new Date(row.line_created_at).toISOString().slice(0, 16).replace("T", " ")
             : "—"
         ];
         r.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-          cell.alignment = { vertical: "middle", horizontal: colNumber >= 7 && colNumber <= 8 ? "right" : "left" };
+          cell.alignment = { vertical: "middle", horizontal: colNumber === 7 ? "right" : "left" };
           cell.font = { size: 10 };
           cell.border = {
             top: { style: "hair", color: { argb: "FFD7E3F0" } },
@@ -532,7 +601,7 @@ async function downloadInvoiceExcel(req, res, next) {
           if (idx % 2 === 1) {
             cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF6FAFF" } };
           }
-          if (colNumber === 7 || colNumber === 8) {
+          if (colNumber === 7) {
             cell.numFmt = "#,##0.##";
           }
         });
@@ -541,29 +610,29 @@ async function downloadInvoiceExcel(req, res, next) {
 
       /* totals row */
       const tr = sheet.getRow(dataRowIdx);
-      tr.values = ["TOTAL", "", "", "", "", "", totalSup, totalAgent, ""];
+      tr.values = ["TOTAL", "", "", "", "", "", totalUplifted, ""];
       tr.eachCell((cell, colNumber) => {
         cell.font = { bold: true, color: { argb: "FF0B51AA" } };
         cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFEAF4FF" } };
-        cell.alignment = { horizontal: colNumber >= 7 && colNumber <= 8 ? "right" : "left" };
+        cell.alignment = { horizontal: colNumber === 7 ? "right" : "left" };
         cell.border = {
           top: { style: "thin", color: { argb: "FF0B51AA" } },
           bottom: { style: "thin", color: { argb: "FF0B51AA" } }
         };
-        if (colNumber === 7 || colNumber === 8) cell.numFmt = "#,##0.##";
+        if (colNumber === 7) cell.numFmt = "#,##0.##";
       });
       dataRowIdx += 1;
     }
 
     /* ===== Amount due card ===== */
     const dueRow = dataRowIdx + 2;
-    sheet.mergeCells(`G${dueRow}:I${dueRow}`);
+    sheet.mergeCells(`G${dueRow}:H${dueRow}`);
     sheet.getCell(`G${dueRow}`).value = "AMOUNT DUE";
     sheet.getCell(`G${dueRow}`).font = { bold: true, color: { argb: "FFFFFFFF" }, size: 11 };
     sheet.getCell(`G${dueRow}`).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF0B51AA" } };
     sheet.getCell(`G${dueRow}`).alignment = { horizontal: "right", indent: 1 };
 
-    sheet.mergeCells(`G${dueRow + 1}:I${dueRow + 1}`);
+    sheet.mergeCells(`G${dueRow + 1}:H${dueRow + 1}`);
     const dueCell = sheet.getCell(`G${dueRow + 1}`);
     dueCell.value = `${String(inv.currency || "USD").toUpperCase()} ${Number(inv.total_amount || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     dueCell.font = { bold: true, size: 16, color: { argb: "FF0B51AA" } };
@@ -572,10 +641,10 @@ async function downloadInvoiceExcel(req, res, next) {
 
     /* ===== Footer ===== */
     const footerRow = dueRow + 4;
-    sheet.mergeCells(`A${footerRow}:I${footerRow}`);
+    sheet.mergeCells(`A${footerRow}:H${footerRow}`);
     const footCell = sheet.getCell(`A${footerRow}`);
     footCell.value =
-      "Thank you for shipping with SBU. Please quote the invoice number on payment. Questions? finance@sbu.rw";
+      "Charges are assessed per AWB / uplift line as shown. Quote the invoice number on payment. Questions? finance@sbu.rw";
     footCell.font = { italic: true, color: { argb: "FF607080" } };
     footCell.alignment = { horizontal: "center" };
 
@@ -615,6 +684,5 @@ module.exports = {
   downloadInvoiceExcel,
   listExporterPricing,
   upsertExporterPricing,
-  downloadWeeklyInvoiceReport,
-  getExporterPriceForBilling
+  downloadWeeklyInvoiceReport
 };

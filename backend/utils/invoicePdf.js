@@ -118,7 +118,7 @@ async function buildInvoicePdf({ invoice, lines, exporterName }) {
     font: fontBold,
     color: BRAND_BLUE
   });
-  page.drawText("Air cargo coordination · Booking · Uplift · Settlement", {
+  page.drawText("Air cargo coordination · AWB-based billing · Booking · Uplift · Settlement", {
     x: margin,
     y: headerBottom - 24,
     size: 7.5,
@@ -485,9 +485,9 @@ async function buildInvoicePdf({ invoice, lines, exporterName }) {
   /* Subtotal line on the left */
   const subY = y - 24;
   const summaryItems = [
-    [`Supervisor verified kgs`, formatKg(totalKgSup)],
-    [`Clearing-agent verified kgs`, formatKg(totalKgAgent)],
-    [`Lines counted`, String(shipmentRows.length || 0)]
+    [`AWB / shipment lines`, String(shipmentRows.length || 0)],
+    [`Supervisor verified kgs (billing weight basis)`, formatKg(totalKgSup)],
+    [`Clearing-agent verified kgs`, formatKg(totalKgAgent)]
   ];
   summaryItems.forEach((pair, i) => {
     page.drawText(pair[0], {
@@ -518,8 +518,8 @@ async function buildInvoicePdf({ invoice, lines, exporterName }) {
   });
   y -= 16;
   const foot =
-    "Thank you for shipping with SBU. Please quote the invoice number on payment. " +
-    "Questions? Reach out to finance@sbu.rw or your dedicated SBU coordinator.";
+    "Charges are assessed per AWB (air waybill) / uplift line as shown. " +
+    "Please quote the invoice number on payment. Questions? Reach out to finance@sbu.rw or your dedicated SBU coordinator.";
   wrapWords(foot, 110).forEach((fl, i) => {
     page.drawText(fl, {
       x: margin,

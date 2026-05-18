@@ -17,7 +17,7 @@ const roles = [
     accent: 'airline'
   },
   {
-    name: 'Airline Supervisor',
+    name: 'Acceptance Team',
     route: '/dashboard/supervisor',
     title: 'Final booking control and shipment notifications',
     permissions: ['Final approval', 'Uplift/offload decision', 'Template messaging', 'PMC capacity control'],

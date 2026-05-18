@@ -80,6 +80,18 @@ app.use(cors({
 app.use(express.json({ limit: "4mb" }));
 app.use(express.urlencoded({ extended: true }));
 
+// Browsers (and cPanel defaults) often request /favicon.ico first. Without a real file,
+// the SPA fallback below would send index.html and the tab shows a wrong/generic icon.
+const publicFaviconSvg = path.join(__dirname, "public", "favicon.svg");
+app.get("/favicon.ico", (req, res, next) => {
+  if (fs.existsSync(publicFaviconSvg)) {
+    res.type("image/svg+xml");
+    res.set("Cache-Control", "public, max-age=604800");
+    return res.sendFile(publicFaviconSvg);
+  }
+  next();
+});
+
 if (!isProd) {
   app.use(morgan("dev"));
 } else {

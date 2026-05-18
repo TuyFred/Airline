@@ -460,4 +460,32 @@ async function lockOrUnlockUser(req, res, next) {
   }
 }
 
-module.exports = { listUsers, listLockHistory, getUser, lockOrUnlockUser, createUser, updateUser, deleteUser };
+async function approvePendingExporterAccount(req, res, next) {
+  try {
+    const { id } = req.params;
+    const rows = await query(`SELECT id, role, is_active FROM users WHERE id = ? LIMIT 1`, [id]);
+    if (!rows.length) return res.status(404).json({ message: "User not found" });
+    const u = rows[0];
+    if (String(u.role) !== "exporter") {
+      return res.status(400).json({ message: "This action applies only to exporter accounts" });
+    }
+    if (Number(u.is_active) === 1) {
+      return res.json({ message: "Account is already active" });
+    }
+    await query(`UPDATE users SET is_active = 1 WHERE id = ?`, [id]);
+    return res.json({ message: "Exporter account approved and activated" });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+module.exports = {
+  listUsers,
+  listLockHistory,
+  getUser,
+  lockOrUnlockUser,
+  createUser,
+  updateUser,
+  deleteUser,
+  approvePendingExporterAccount
+};

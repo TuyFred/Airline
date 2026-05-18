@@ -14,7 +14,7 @@ const roleLabels = {
   'exporter': 'Exporter',
   'airline': 'Airline',
   'airline-analyst': 'Airline Analyst',
-  'airline-supervisor': 'Airline Supervisor',
+  'airline-supervisor': 'Acceptance Team',
   'clearing-agent': 'Clearing Agent',
   'admin': 'Admin'
 };
@@ -74,6 +74,11 @@ export default function AuthPage({ mode = 'login', redirectTo = 'dashboard/expor
         ...registerForm,
         email: String(registerForm.email || '').trim().toLowerCase()
       });
+      if (result.pending_approval) {
+        setMessage(result.message || 'Your account will be activated after admin approval.');
+        setActiveMode('login');
+        return;
+      }
       localStorage.setItem('sbu_token', result.token);
       localStorage.setItem('sbu_user', JSON.stringify(result.user));
       onAuth?.(result.user);
@@ -92,10 +97,10 @@ export default function AuthPage({ mode = 'login', redirectTo = 'dashboard/expor
           <p className="auth-kicker">Secure access</p>
           <h1>SBU Export Coordination Hub</h1>
           <p>
-            Log in to your role dashboard or create an exporter account to start booking air cargo space.
+            Log in to your role dashboard or create an exporter account. New exporter sign-ups stay inactive until an administrator approves the account.
           </p>
           <div className="auth-badges">
-            <span>Exporter self-signup</span>
+            <span>Exporter signup (admin approval)</span>
             <span>Admin-managed roles</span>
             <span>Protected dashboards</span>
           </div>

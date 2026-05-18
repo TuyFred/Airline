@@ -24,6 +24,7 @@ const {
   deleteUpliftNotification,
   adjustExporterApprovedAllocation,
   approvePendingAllocationIncrease,
+  rejectPendingAllocationIncrease,
   exportBookingsToExcel,
   exportGroupedBookingsToExcel,
   exportCapacityToExcel,
@@ -86,6 +87,7 @@ router.patch(
   adjustExporterApprovedAllocation
 );
 router.patch("/:id/approve-pending-allocation", requireRoles("airline_analyst", "airline_supervisor", "admin"), approvePendingAllocationIncrease);
+router.patch("/:id/reject-pending-allocation", requireRoles("airline_analyst", "airline_supervisor", "admin"), rejectPendingAllocationIncrease);
 router.patch(
   "/:id/edit-pending",
   requireRoles("exporter"),

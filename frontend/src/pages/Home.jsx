@@ -6,7 +6,6 @@ import HeroBanner from '../components/HeroBanner';
 import VisionMission from '../components/VisionMission';
 import AboutUs from '../components/AboutUs';
 import OurServices from '../components/OurServices';
-import OurCustomers from '../components/OurCustomers';
 import Footer from '../components/Footer';
 
 export default function Home({ maintenanceMessage = '' }) {
@@ -18,7 +17,6 @@ export default function Home({ maintenanceMessage = '' }) {
       <VisionMission />
       <AboutUs />
       <OurServices />
-      <OurCustomers />
       <Footer />
     </div>
   );

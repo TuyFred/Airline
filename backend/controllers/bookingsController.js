@@ -4,7 +4,7 @@ const { emitCapacityUpdate } = require("../config/socket");
 const { pushNotification } = require("../utils/notifications");
 const { sendBrevoEmail, getBrevoSender } = require("../utils/email");
 const { bookingReceivedEmail, bookingCancelledEmail } = require("../utils/emailTemplates");
-const { getExporterPriceForBilling } = require("./financeController");
+const { getExporterPricingConfig, countBillableAwbs } = require("../services/exporterPricing");
 let upliftHasReadColumn = null;
 let upliftHasUpdatedAtColumn = null;
 const upliftColumnCache = new Map();
@@ -148,9 +148,16 @@ async function createBooking(req, res, next) {
     }
 
     const cap = capRows[0] || null;
-    const resolvedAirlineId = Number(cap?.airline_id || airline_id);
-    const resolvedFlightDate = String(cap?.flight_date || flight_date).slice(0, 10);
-    const resolvedDestination = String(cap?.destination || destination || '').trim().toUpperCase();
+    if (!cap) {
+      return res.status(400).json({
+        message:
+          "No published capacity exists for this airline, flight date, and destination. Book only against dates shown in Space Availability."
+      });
+    }
+
+    const resolvedAirlineId = Number(cap.airline_id);
+    const resolvedFlightDate = String(cap.flight_date).slice(0, 10);
+    const resolvedDestination = String(cap.destination || destination || "").trim().toUpperCase();
 
     const requestedSkids = Number(skids || 0);
     const requestedKg = Number(tonnage_kg || 0);
@@ -574,7 +581,7 @@ async function addUpliftConfirmation(req, res, next) {
 
       if (booking.length) {
         const b = booking[0];
-        const existingLine = await query(`SELECT id, invoice_id FROM invoice_lines WHERE booking_id = ? LIMIT 1`, [id]);
+        const existingLine = await query(`SELECT id FROM invoice_lines WHERE booking_id = ? LIMIT 1`, [id]);
         if (!existingLine.length) {
           const awbRows = await query(
             `SELECT awb_number FROM uplift_notifications WHERE booking_id = ? AND awb_number IS NOT NULL AND awb_number <> '' ORDER BY id DESC`,
@@ -584,9 +591,24 @@ async function addUpliftConfirmation(req, res, next) {
           const awbSummary = awbList.length ? awbList.slice(0, 3).join(", ") + (awbList.length > 3 ? ", …" : "") : "";
 
           const invoiceNumber = `INV-${Date.now()}`;
-          const unitPrice = await getExporterPriceForBilling(b.exporter_id);
-          const billingKg = Number(supervisorKg);
-          const totalAmount = +(billingKg * unitPrice).toFixed(2);
+          const cfg = await getExporterPricingConfig(b.exporter_id);
+          const usePerAwb = cfg.model === "per_awb" && cfg.pricePerAwb != null && Number.isFinite(cfg.pricePerAwb);
+          let quantityUnits;
+          let unitPrice;
+          let totalAmount;
+          let billingSummary;
+          if (usePerAwb) {
+            const { count } = await countBillableAwbs(id);
+            quantityUnits = count;
+            unitPrice = cfg.pricePerAwb;
+            totalAmount = +(quantityUnits * unitPrice).toFixed(2);
+            billingSummary = `${quantityUnits} AWB line(s) @ $${unitPrice} = $${totalAmount.toFixed(2)}`;
+          } else {
+            quantityUnits = Number(supervisorKg);
+            unitPrice = cfg.pricePerKg;
+            totalAmount = +(quantityUnits * unitPrice).toFixed(2);
+            billingSummary = `${quantityUnits.toLocaleString("en-US")} kg @ $${unitPrice}/kg = $${totalAmount.toFixed(2)}`;
+          }
           const dueDate = new Date();
           dueDate.setDate(dueDate.getDate() + 30);
 
@@ -601,7 +623,7 @@ async function addUpliftConfirmation(req, res, next) {
             await query(
               `INSERT INTO invoice_lines (invoice_id, booking_id, description, quantity_kg, unit_price, total_price)
                VALUES (?, ?, ?, ?, ?, ?)`,
-              [invoiceRes.insertId, id, description, billingKg, unitPrice, totalAmount]
+              [invoiceRes.insertId, id, description, quantityUnits, unitPrice, totalAmount]
             );
 
             invoiceCreated = true;
@@ -615,7 +637,7 @@ async function addUpliftConfirmation(req, res, next) {
               await pushNotification(
                 u.id,
                 "Invoice issued",
-                `Invoice ${invoiceNumber} for booking #${id} has been generated automatically (${billingKg.toLocaleString("en-US")} kg @ $${unitPrice}/kg = $${totalAmount.toFixed(2)}).`,
+                `Invoice ${invoiceNumber} for booking #${id} has been generated automatically (${billingSummary}).`,
                 "info"
               );
             }
@@ -1003,12 +1025,15 @@ async function adjustExporterApprovedAllocation(req, res, next) {
     }
 
     const flightDay = String(booking.flight_date).slice(0, 10);
-    const today = new Date().toISOString().slice(0, 10);
+    const departureAt = new Date(`${flightDay}T23:59:59`);
+    const hoursUntilDeparture = (departureAt.getTime() - Date.now()) / (1000 * 60 * 60);
+    if (!Number.isFinite(hoursUntilDeparture) || hoursUntilDeparture < 24) {
+      return res.status(400).json({
+        message: "Approved bookings can only be adjusted more than 24 hours before the flight date."
+      });
+    }
     const oldSkids = Number(booking.skids);
     const oldKg = Number(booking.tonnage_kg);
-    if (flightDay < today) {
-      return res.status(400).json({ message: "Booking space can only be edited before the flight date" });
-    }
     if (oldSkids === newSkids && oldKg === newKg) {
       return res.json({ message: "No change", status: "unchanged" });
     }
@@ -1173,6 +1198,38 @@ async function approvePendingAllocationIncrease(req, res, next) {
   }
 }
 
+async function rejectPendingAllocationIncrease(req, res, next) {
+  try {
+    const { id } = req.params;
+    const bookingRows = await query(`SELECT * FROM bookings WHERE id = ? LIMIT 1`, [id]);
+    if (!bookingRows.length) return res.status(404).json({ message: "Booking not found" });
+    const booking = bookingRows[0];
+    const pending = parsePendingIncreaseTag(booking.pending_reason);
+    if (!pending) {
+      return res.status(400).json({ message: "No pending increase tag on this booking" });
+    }
+
+    const nextReason = stripPendingIncreaseTag(booking.pending_reason) || null;
+    await query(`UPDATE bookings SET pending_reason = ?, updated_at = NOW() WHERE id = ?`, [nextReason, id]);
+
+    const exporterUsers = await query(`SELECT id FROM users WHERE linked_exporter_id = ? AND role = 'exporter'`, [
+      booking.exporter_id
+    ]);
+    for (const u of exporterUsers) {
+      await pushNotification(
+        u.id,
+        "Additional space request declined",
+        `Your request to increase booking #${id} to ${pending.skids} skids / ${pending.tonnage_kg} kg was not approved. Your confirmed allocation is unchanged.`,
+        "warning"
+      );
+    }
+
+    return res.json({ message: "Pending increase rejected" });
+  } catch (error) {
+    return next(error);
+  }
+}
+
 async function exportGroupedBookingsToExcel(req, res, next) {
   try {
     const { generateBookingsExcel } = require("../utils/excelExport");
@@ -1306,6 +1363,16 @@ async function editPendingBooking(req, res, next) {
       return res.status(400).json({ message: "Only pending bookings can be edited" });
     }
 
+    const capRows = await query(
+      `SELECT id FROM capacities WHERE airline_id = ? AND DATE(flight_date) = DATE(?) AND UPPER(TRIM(destination)) = UPPER(TRIM(?)) LIMIT 1`,
+      [booking.airline_id, flight_date, booking.destination]
+    );
+    if (!capRows.length) {
+      return res.status(400).json({
+        message: "No published capacity for that flight date and destination. Choose a date that appears in Space Availability."
+      });
+    }
+
     // Update the booking with new values
     await query(
       `UPDATE bookings SET flight_date = ?, skids = ?, tonnage_kg = ?, updated_at = NOW() WHERE id = ?`,
@@ -1382,6 +1449,7 @@ module.exports = {
   deleteUpliftNotification,
   adjustExporterApprovedAllocation,
   approvePendingAllocationIncrease,
+  rejectPendingAllocationIncrease,
   exportBookingsToExcel,
   exportGroupedBookingsToExcel,
   exportCapacityToExcel

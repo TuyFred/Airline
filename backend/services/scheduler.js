@@ -2,6 +2,7 @@ const cron = require("node-cron");
 const dayjs = require("dayjs");
 const { query } = require("../config/db");
 const { INVOICE_SETTINGS, ROLES } = require("../config/constants");
+const { getExporterPricingConfig, countBillableAwbs } = require("./exporterPricing");
 const { generateInvoiceNumber, calculateNoShowCharge } = require("../utils/invoice");
 const { pushNotification } = require("../utils/notifications");
 const { sendBrevoEmail, getBrevoSender } = require("../utils/email");
@@ -115,19 +116,28 @@ async function processWeeklyInvoices() {
     ]);
     if (exists.length) continue;
 
-    const total = Number(row.matched_kg) * INVOICE_SETTINGS.DEFAULT_PRICE_PER_KG;
+    const cfg = await getExporterPricingConfig(row.exporter_id);
+    const usePerAwb = cfg.model === "per_awb" && cfg.pricePerAwb != null && Number.isFinite(cfg.pricePerAwb);
+    let quantity;
+    let unitPrice;
+    let total;
+    let description = "Weekly uplift confirmed by airline and clearing agent";
+    if (usePerAwb) {
+      const { count } = await countBillableAwbs(row.booking_id);
+      quantity = count;
+      unitPrice = cfg.pricePerAwb;
+      total = +(quantity * unitPrice).toFixed(2);
+      description += " (per AWB)";
+    } else {
+      quantity = Number(row.matched_kg);
+      unitPrice = cfg.pricePerKg;
+      total = +(quantity * unitPrice).toFixed(2);
+    }
 
     await query(
       `INSERT INTO invoice_lines (invoice_id, booking_id, description, quantity_kg, unit_price, total_price)
        VALUES (?, ?, ?, ?, ?, ?)`,
-      [
-        invoiceId,
-        row.booking_id,
-        "Weekly uplift confirmed by airline and clearing agent",
-        row.matched_kg,
-        INVOICE_SETTINGS.DEFAULT_PRICE_PER_KG,
-        total
-      ]
+      [invoiceId, row.booking_id, description, quantity, unitPrice, total]
     );
 
     await recalculateInvoice(invoiceId);
